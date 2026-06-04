@@ -155,6 +155,7 @@ describe('Database Initialization', () => {
 
       expect(userTableQuery).toBeDefined();
       expect(userTableQuery[0]).toContain('email TEXT PRIMARY KEY');
+      expect(userTableQuery[0]).toContain('password_hash TEXT NOT NULL');
       expect(userTableQuery[0]).toContain('created_at DATETIME DEFAULT CURRENT_TIMESTAMP');
     });
 

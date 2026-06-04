@@ -102,49 +102,20 @@ describe('Authentication Middleware', () => {
     });
   });
 
-  describe('New User Creation', () => {
-    test('should create new user if not exists and call next()', (done) => {
+  describe('Unregistered User Rejection', () => {
+    test('should return 401 if user does not exist', (done) => {
       req.headers['x-user-email'] = 'newuser@example.com';
       
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(null, null); // User doesn't exist
       });
-      
-      mockDb.run.mockImplementation((query, params, callback) => {
-        callback(null);
-      });
 
       authenticateUser(req, res, next);
 
       setImmediate(() => {
-        expect(mockDb.run).toHaveBeenCalledWith(
-          'INSERT INTO users (email) VALUES (?)',
-          ['newuser@example.com'],
-          expect.any(Function)
-        );
-        expect(req.userEmail).toBe('newuser@example.com');
-        expect(next).toHaveBeenCalled();
-        done();
-      });
-    });
-
-    test('should handle error when creating new user', (done) => {
-      req.headers['x-user-email'] = 'newuser@example.com';
-      
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, null);
-      });
-      
-      mockDb.run.mockImplementation((query, params, callback) => {
-        callback(new Error('Insert failed'));
-      });
-
-      authenticateUser(req, res, next);
-
-      setImmediate(() => {
-        expect(res.status).toHaveBeenCalledWith(500);
+        expect(res.status).toHaveBeenCalledWith(401);
         expect(res.json).toHaveBeenCalledWith({
-          error: 'Failed to create user'
+          error: 'User not found. Please register first.'
         });
         expect(next).not.toHaveBeenCalled();
         done();
