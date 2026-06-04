@@ -36,6 +36,16 @@ import {
 import apiClient from '../api/client';
 import { type Client, type WorkEntry } from '../types/api';
 
+function normalizeDate(date: string | number): string {
+  if (typeof date === 'number') {
+    return format(new Date(date), 'yyyy-MM-dd');
+  }
+  if (date.includes('T')) {
+    return date.split('T')[0];
+  }
+  return date;
+}
+
 interface CellValue {
   hours: number;
   entryId: number | null;
@@ -75,7 +85,7 @@ const TimesheetPage: React.FC = () => {
     const startStr = format(currentWeekStart, 'yyyy-MM-dd');
     const endStr = format(weekEnd, 'yyyy-MM-dd');
     return allWorkEntries.filter((entry) => {
-      const d = entry.date.split('T')[0];
+      const d = normalizeDate(entry.date);
       return d >= startStr && d <= endStr;
     });
   }, [allWorkEntries, currentWeekStart, weekEnd]);
@@ -83,7 +93,7 @@ const TimesheetPage: React.FC = () => {
   const grid = useMemo(() => {
     const map = new Map<string, CellValue>();
     for (const entry of weekEntries) {
-      const dateStr = entry.date.split('T')[0];
+      const dateStr = normalizeDate(entry.date);
       const key = `${entry.client_id}_${dateStr}`;
       const existing = map.get(key);
       if (existing) {
