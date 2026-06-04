@@ -188,7 +188,7 @@ const ClientsPage: React.FC = () => {
         </Box>
       </Box>
 
-      {error && (
+      {error && !open && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
           {error}
         </Alert>
@@ -284,8 +284,13 @@ const ClientsPage: React.FC = () => {
         <DialogTitle>
           {editingClient ? 'Edit Client' : 'Add New Client'}
         </DialogTitle>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <DialogContent>
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+                {error}
+              </Alert>
+            )}
             <TextField
               autoFocus
               margin="dense"
