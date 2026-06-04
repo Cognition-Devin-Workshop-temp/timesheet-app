@@ -3,6 +3,8 @@ const {
   workEntrySchema,
   updateWorkEntrySchema,
   updateClientSchema,
+  projectSchema,
+  updateProjectSchema,
   emailSchema
 } = require('../../validation/schemas');
 
@@ -286,6 +288,144 @@ describe('Validation Schemas', () => {
       };
 
       const { error } = updateClientSchema.validate(update);
+      expect(error).toBeUndefined();
+    });
+  });
+
+  describe('projectSchema', () => {
+    test('should validate valid project with all fields', () => {
+      const validProject = {
+        name: 'Test Project',
+        description: 'A test project',
+        clientId: 1,
+        startDate: '2024-06-01',
+        status: 'active'
+      };
+
+      const { error } = projectSchema.validate(validProject);
+      expect(error).toBeUndefined();
+    });
+
+    test('should validate project with only name', () => {
+      const project = {
+        name: 'Minimal Project'
+      };
+
+      const { error } = projectSchema.validate(project);
+      expect(error).toBeUndefined();
+    });
+
+    test('should reject missing name', () => {
+      const project = {
+        description: 'No name'
+      };
+
+      const { error } = projectSchema.validate(project);
+      expect(error).toBeDefined();
+    });
+
+    test('should reject empty name', () => {
+      const project = {
+        name: ''
+      };
+
+      const { error } = projectSchema.validate(project);
+      expect(error).toBeDefined();
+    });
+
+    test('should reject invalid status value', () => {
+      const project = {
+        name: 'Test',
+        status: 'invalid-status'
+      };
+
+      const { error } = projectSchema.validate(project);
+      expect(error).toBeDefined();
+    });
+
+    test('should allow null clientId', () => {
+      const project = {
+        name: 'Test',
+        clientId: null
+      };
+
+      const { error } = projectSchema.validate(project);
+      expect(error).toBeUndefined();
+    });
+
+    test('should default status to active', () => {
+      const project = {
+        name: 'Test'
+      };
+
+      const { value } = projectSchema.validate(project);
+      expect(value.status).toBe('active');
+    });
+
+    test('should accept on-hold status', () => {
+      const project = {
+        name: 'Test',
+        status: 'on-hold'
+      };
+
+      const { error } = projectSchema.validate(project);
+      expect(error).toBeUndefined();
+    });
+
+    test('should accept completed status', () => {
+      const project = {
+        name: 'Test',
+        status: 'completed'
+      };
+
+      const { error } = projectSchema.validate(project);
+      expect(error).toBeUndefined();
+    });
+  });
+
+  describe('updateProjectSchema', () => {
+    test('should validate with at least one field', () => {
+      const update = {
+        name: 'Updated Name'
+      };
+
+      const { error } = updateProjectSchema.validate(update);
+      expect(error).toBeUndefined();
+    });
+
+    test('should validate status update', () => {
+      const update = {
+        status: 'completed'
+      };
+
+      const { error } = updateProjectSchema.validate(update);
+      expect(error).toBeUndefined();
+    });
+
+    test('should reject empty object', () => {
+      const update = {};
+
+      const { error } = updateProjectSchema.validate(update);
+      expect(error).toBeDefined();
+    });
+
+    test('should reject invalid status', () => {
+      const update = {
+        status: 'bad-status'
+      };
+
+      const { error } = updateProjectSchema.validate(update);
+      expect(error).toBeDefined();
+    });
+
+    test('should validate multiple fields update', () => {
+      const update = {
+        name: 'New Name',
+        status: 'on-hold',
+        description: 'Updated desc'
+      };
+
+      const { error } = updateProjectSchema.validate(update);
       expect(error).toBeUndefined();
     });
   });
