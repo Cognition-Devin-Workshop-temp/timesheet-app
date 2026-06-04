@@ -585,4 +585,32 @@ describe('Work Entry Routes', () => {
       expect(response.body.message).toBe('Work entry updated successfully');
     });
   });
+
+  describe('POST /api/work-entries - Unexpected Error', () => {
+    test('should handle unexpected error in try-catch', async () => {
+      getDatabase.mockImplementation(() => {
+        throw new Error('Unexpected failure');
+      });
+
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 5, date: '2024-01-01' });
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe('PUT /api/work-entries/:id - Unexpected Error', () => {
+    test('should handle unexpected error in try-catch', async () => {
+      getDatabase.mockImplementation(() => {
+        throw new Error('Unexpected failure');
+      });
+
+      const response = await request(app)
+        .put('/api/work-entries/1')
+        .send({ hours: 8 });
+
+      expect(response.status).toBe(500);
+    });
+  });
 });

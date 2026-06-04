@@ -404,7 +404,162 @@ describe('Report Routes', () => {
   });
 
 
-  describe('PDF Export Success Path', () => {
+  describe('PDF Export Full Path', () => {
+    function createStreamingPdfMock(yValue = 100) {
+      const PDFDocument = require('pdfkit');
+      PDFDocument.mockImplementation(() => {
+        const mock = {
+          fontSize: jest.fn().mockReturnThis(),
+          text: jest.fn().mockReturnThis(),
+          moveDown: jest.fn().mockReturnThis(),
+          moveTo: jest.fn().mockReturnThis(),
+          lineTo: jest.fn().mockReturnThis(),
+          stroke: jest.fn().mockReturnThis(),
+          addPage: jest.fn().mockReturnThis(),
+          pipe: jest.fn((res) => { mock._res = res; }),
+          end: jest.fn(() => { if (mock._res) mock._res.end(); }),
+          y: yValue,
+          _res: null
+        };
+        return mock;
+      });
+      return PDFDocument;
+    }
+
+    test('should generate PDF with correct headers and content', async () => {
+      const mockClient = { id: 1, name: 'Test Client' };
+      const mockWorkEntries = [
+        { hours: 5, description: 'Task 1', date: '2024-01-01', created_at: '2024-01-01' },
+        { hours: 3.5, description: 'Task 2', date: '2024-01-02', created_at: '2024-01-02' }
+      ];
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, mockClient);
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, mockWorkEntries);
+      });
+
+      const PDFDocument = createStreamingPdfMock();
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      const mockDoc = PDFDocument.mock.results[PDFDocument.mock.results.length - 1].value;
+      expect(mockDoc.pipe).toHaveBeenCalled();
+      expect(mockDoc.end).toHaveBeenCalled();
+      expect(mockDoc.fontSize).toHaveBeenCalled();
+      expect(mockDoc.text).toHaveBeenCalled();
+    });
+
+    test('should generate PDF with empty work entries', async () => {
+      const mockClient = { id: 1, name: 'Empty Client' };
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, mockClient);
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, []);
+      });
+
+      const PDFDocument = createStreamingPdfMock();
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      const mockDoc = PDFDocument.mock.results[PDFDocument.mock.results.length - 1].value;
+      expect(mockDoc.pipe).toHaveBeenCalled();
+      expect(mockDoc.end).toHaveBeenCalled();
+    });
+
+    test('should add new page when y exceeds 700', async () => {
+      const mockClient = { id: 1, name: 'Test Client' };
+      const mockWorkEntries = [
+        { hours: 1, description: 'Entry', date: '2024-01-01', created_at: '2024-01-01' }
+      ];
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, mockClient);
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, mockWorkEntries);
+      });
+
+      const PDFDocument = createStreamingPdfMock(750);
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      const mockDoc = PDFDocument.mock.results[PDFDocument.mock.results.length - 1].value;
+      expect(mockDoc.addPage).toHaveBeenCalled();
+    });
+
+    test('should add separator lines every 5 entries', async () => {
+      const mockClient = { id: 1, name: 'Test Client' };
+      const mockWorkEntries = Array.from({ length: 6 }, (_, i) => ({
+        hours: 1,
+        description: `Entry ${i + 1}`,
+        date: '2024-01-01',
+        created_at: '2024-01-01'
+      }));
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, mockClient);
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, mockWorkEntries);
+      });
+
+      const PDFDocument = createStreamingPdfMock();
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      const mockDoc = PDFDocument.mock.results[PDFDocument.mock.results.length - 1].value;
+      expect(mockDoc.moveTo).toHaveBeenCalled();
+      expect(mockDoc.stroke).toHaveBeenCalled();
+    });
+
+    test('should handle entry with no description in PDF', async () => {
+      const mockClient = { id: 1, name: 'Test Client' };
+      const mockWorkEntries = [
+        { hours: 2, description: null, date: '2024-01-01', created_at: '2024-01-01' }
+      ];
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, mockClient);
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, mockWorkEntries);
+      });
+
+      const PDFDocument = createStreamingPdfMock();
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      const mockDoc = PDFDocument.mock.results[PDFDocument.mock.results.length - 1].value;
+      expect(mockDoc.text).toHaveBeenCalledWith('No description', expect.any(Number), expect.any(Number), expect.any(Object));
+    });
+
+    test('should set correct content-type header for PDF', async () => {
+      const mockClient = { id: 1, name: 'Test Client' };
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, mockClient);
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, []);
+      });
+
+      const PDFDocument = createStreamingPdfMock();
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      expect(response.headers['content-type']).toContain('application/pdf');
+    });
+
     test('should handle database error when fetching work entries for PDF', async () => {
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(null, { id: 1, name: 'Test Client' });
