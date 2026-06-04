@@ -12,18 +12,24 @@ test.describe('Flipkart Product Detail Page', () => {
     await homePage.searchFor(searchData.validQueries[0]);
     await searchResultsPage.expectResultsVisible();
 
-    // Product detail opens in a new tab on Flipkart
-    const [openedPage] = await Promise.all([
-      page.context().waitForEvent('page'),
-      searchResultsPage.clickProduct(0),
-    ]);
-    await openedPage.waitForLoadState('domcontentloaded');
-    newTab = openedPage;
+    // Product detail may open in a new tab or navigate in-place
+    const newPagePromise = page.context().waitForEvent('page', { timeout: 10_000 }).catch(() => null);
+    await searchResultsPage.clickProduct(0);
+    const openedPage = await newPagePromise;
+
+    if (openedPage) {
+      await openedPage.waitForLoadState('domcontentloaded');
+      newTab = openedPage;
+    } else {
+      await page.waitForLoadState('domcontentloaded');
+      newTab = page;
+    }
     productPage = new ProductDetailPage(newTab);
   });
 
-  test.afterEach(async () => {
-    if (newTab && !newTab.isClosed()) {
+  test.afterEach(async ({ page }) => {
+    // Only close if newTab is a separate page from the original
+    if (newTab && newTab !== page && !newTab.isClosed()) {
       await newTab.close();
     }
   });

@@ -20,9 +20,9 @@ export class SearchResultsPage extends BasePage {
   constructor(page: Page) {
     super(page);
 
-    // Product cards
-    this.resultItems = page.locator('div[data-id], div._1AtVbE, div.cPHDOP');
-    this.resultTitles = page.locator('div._4rR01T, a.s1Q9rs, a.wjcEIp, div.KzDlHZ');
+    // Product cards — use multiple selectors to handle Flipkart's changing class names
+    this.resultItems = page.locator('div[data-id], div._1AtVbE, div.cPHDOP, div[data-tkid]');
+    this.resultTitles = page.locator('div._4rR01T, a.s1Q9rs, a.wjcEIp, div.KzDlHZ, a[class*="WKTcLC"], a[title][href*="/p/"]');
 
     // Sort bar
     this.sortByRelevance = page.locator('div:has-text("Relevance")[class*="sort"], a:has-text("Relevance")').first();
@@ -34,8 +34,8 @@ export class SearchResultsPage extends BasePage {
     // Filters
     this.filterSidebar = page.locator('div._1UDcfZ, div[class*="filter"], aside').first();
 
-    // Prices
-    this.priceLabels = page.locator('div._30jeq3, div.Nx9bqj');
+    // Prices — multiple selectors to handle changing class names
+    this.priceLabels = page.locator('div._30jeq3, div.Nx9bqj, div[class*="hl05eU"] div:first-child');
 
     // No results
     this.noResultsMessage = page.locator('div:has-text("Sorry, no results found"), div._1OKdi2');
