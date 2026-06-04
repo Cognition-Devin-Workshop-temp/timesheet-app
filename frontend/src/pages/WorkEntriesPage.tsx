@@ -471,7 +471,7 @@ const WorkEntriesPage: React.FC = () => {
                 inputProps={{ min: 0.01, max: 24, step: 0.01 }}
                 value={formData.hours}
                 onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
-                disabled={createMutation.isPending || updateMutation.isPending || (!formData.isWfh && !!formData.swipeIn && !!formData.swipeOut)}
+                disabled={createMutation.isPending || updateMutation.isPending || (!formData.isWfh && !!formData.swipeIn && !!formData.swipeOut && calculateHoursFromSwipe(formData.swipeIn, formData.swipeInPeriod, formData.swipeOut, formData.swipeOutPeriod) !== null)}
               />
 
               <DatePicker
