@@ -29,6 +29,13 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
+// Stricter rate limiter for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5, // 5 login/register attempts per 15 minutes per IP
+  message: { error: 'Too many login attempts, please try again later' }
+});
+
 // Logging
 app.use(morgan('combined'));
 
@@ -42,7 +49,7 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/work-entries', workEntryRoutes);
 app.use('/api/reports', reportRoutes);
