@@ -11,6 +11,7 @@ import DashboardPage from './pages/DashboardPage';
 import ClientsPage from './pages/ClientsPage';
 import WorkEntriesPage from './pages/WorkEntriesPage';
 import ReportsPage from './pages/ReportsPage';
+import MarketingPortal from './pages/MarketingPortal/MarketingPortal';
 
 const theme = createTheme({
   palette: {
@@ -42,6 +43,7 @@ const AppContent: React.FC = () => {
   return (
     <Router>
       <Routes>
+        <Route path="/portal" element={<MarketingPortal />} />
         <Route path="/login" element={<LoginPage />} />
         <Route
           path="/*"
