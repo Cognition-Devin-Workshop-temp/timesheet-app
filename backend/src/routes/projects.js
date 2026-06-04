@@ -70,7 +70,8 @@ router.post('/', (req, res, next) => {
       return next(error);
     }
 
-    const { name, description, clientId, startDate, status } = value;
+    const { name, description, clientId, startDate: rawStartDate, status } = value;
+    const startDate = rawStartDate instanceof Date ? rawStartDate.toISOString().split('T')[0] : rawStartDate;
     const db = getDatabase();
 
     // If clientId provided, verify it belongs to the user
@@ -145,6 +146,11 @@ router.put('/:id', (req, res, next) => {
     const { error, value } = updateProjectSchema.validate(req.body);
     if (error) {
       return next(error);
+    }
+
+    // Normalize startDate from Joi Date object to ISO string
+    if (value.startDate instanceof Date) {
+      value.startDate = value.startDate.toISOString().split('T')[0];
     }
 
     const db = getDatabase();
