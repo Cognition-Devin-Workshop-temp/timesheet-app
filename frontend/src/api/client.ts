@@ -133,6 +133,42 @@ class ApiClient {
     return response.data;
   }
 
+  // Team workload endpoints
+  async getTeamWorkload(startDate?: string, endDate?: string) {
+    const params: Record<string, string> = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    const response = await this.client.get('/api/team/workload', { params });
+    return response.data;
+  }
+
+  async getMemberBreakdown(userEmail: string, startDate?: string, endDate?: string) {
+    const params: Record<string, string> = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    const response = await this.client.get(
+      `/api/team/workload/${encodeURIComponent(userEmail)}/breakdown`,
+      { params }
+    );
+    return response.data;
+  }
+
+  async getTeamMembers() {
+    const response = await this.client.get('/api/team/members');
+    return response.data;
+  }
+
+  async updateTeamMember(
+    userEmail: string,
+    data: { displayName?: string; weeklyCapacity?: number; role?: string }
+  ) {
+    const response = await this.client.patch(
+      `/api/team/members/${encodeURIComponent(userEmail)}`,
+      data
+    );
+    return response.data;
+  }
+
   // Health check
   async healthCheck() {
     const response = await this.client.get('/health');

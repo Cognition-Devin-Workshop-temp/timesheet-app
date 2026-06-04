@@ -17,7 +17,7 @@ router.post('/login', async (req, res, next) => {
     const db = getDatabase();
 
     // Check if user exists
-    db.get('SELECT email, created_at FROM users WHERE email = ?', [email], (err, row) => {
+    db.get('SELECT email, display_name, role, team_id, weekly_capacity, created_at FROM users WHERE email = ?', [email], (err, row) => {
       if (err) {
         console.error('Database error:', err);
         return res.status(500).json({ error: 'Internal server error' });
@@ -29,6 +29,9 @@ router.post('/login', async (req, res, next) => {
           message: 'Login successful',
           user: {
             email: row.email,
+            displayName: row.display_name || null,
+            role: row.role,
+            teamId: row.team_id || null,
             createdAt: row.created_at
           }
         });
@@ -44,6 +47,9 @@ router.post('/login', async (req, res, next) => {
             message: 'User created and logged in successfully',
             user: {
               email: email,
+              displayName: null,
+              role: 'member',
+              teamId: null,
               createdAt: new Date().toISOString()
             }
           });
@@ -59,7 +65,7 @@ router.post('/login', async (req, res, next) => {
 router.get('/me', authenticateUser, (req, res) => {
   const db = getDatabase();
   
-  db.get('SELECT email, created_at FROM users WHERE email = ?', [req.userEmail], (err, row) => {
+  db.get('SELECT email, display_name, role, team_id, weekly_capacity, created_at FROM users WHERE email = ?', [req.userEmail], (err, row) => {
     if (err) {
       console.error('Database error:', err);
       return res.status(500).json({ error: 'Internal server error' });
@@ -72,6 +78,9 @@ router.get('/me', authenticateUser, (req, res) => {
     res.json({
       user: {
         email: row.email,
+        displayName: row.display_name || null,
+        role: row.role,
+        teamId: row.team_id || null,
         createdAt: row.created_at
       }
     });

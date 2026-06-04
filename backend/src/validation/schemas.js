@@ -32,10 +32,23 @@ const emailSchema = Joi.object({
   email: Joi.string().email().required()
 });
 
+const teamWorkloadQuerySchema = Joi.object({
+  startDate: Joi.date().iso().optional(),
+  endDate: Joi.date().iso().min(Joi.ref('startDate')).optional(),
+});
+
+const updateMemberSchema = Joi.object({
+  displayName: Joi.string().trim().max(255).optional(),
+  weeklyCapacity: Joi.number().min(0).max(168).precision(2).optional(),
+  role: Joi.string().valid('manager', 'member').optional(),
+}).min(1);
+
 module.exports = {
   clientSchema,
   workEntrySchema,
   updateWorkEntrySchema,
   updateClientSchema,
-  emailSchema
+  emailSchema,
+  teamWorkloadQuerySchema,
+  updateMemberSchema
 };
