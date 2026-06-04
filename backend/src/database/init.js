@@ -59,6 +59,8 @@ async function initializeDatabase() {
           hours DECIMAL(5,2) NOT NULL,
           description TEXT,
           date DATE NOT NULL,
+          swipe_in TEXT,
+          swipe_out TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,

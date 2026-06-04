@@ -41,8 +41,8 @@ describe('Work Entry Routes', () => {
   describe('GET /api/work-entries', () => {
     test('should return all work entries for user', async () => {
       const mockEntries = [
-        { id: 1, client_id: 1, hours: 5, description: 'Work 1', date: '2024-01-01', client_name: 'Client A' },
-        { id: 2, client_id: 2, hours: 3, description: 'Work 2', date: '2024-01-02', client_name: 'Client B' }
+        { id: 1, client_id: 1, hours: 5, description: 'Work 1', date: '2024-01-01', swipe_in: '09:00 AM', swipe_out: '02:00 PM', client_name: 'Client A' },
+        { id: 2, client_id: 2, hours: 3, description: 'Work 2', date: '2024-01-02', swipe_in: null, swipe_out: null, client_name: 'Client B' }
       ];
 
       mockDb.all.mockImplementation((query, params, callback) => {
@@ -91,7 +91,7 @@ describe('Work Entry Routes', () => {
 
   describe('GET /api/work-entries/:id', () => {
     test('should return specific work entry', async () => {
-      const mockEntry = { id: 1, client_id: 1, hours: 5, description: 'Work', client_name: 'Client A' };
+      const mockEntry = { id: 1, client_id: 1, hours: 5, description: 'Work', swipe_in: '09:00 AM', swipe_out: '02:00 PM', client_name: 'Client A' };
 
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(null, mockEntry);
@@ -583,6 +583,158 @@ describe('Work Entry Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.message).toBe('Work entry updated successfully');
+    });
+  });
+
+  describe('POST /api/work-entries - Swipe Times', () => {
+    test('should create work entry with swipe-in and swipe-out times', async () => {
+      const newEntry = {
+        clientId: 1,
+        hours: 9,
+        description: 'Office work',
+        date: '2024-01-15',
+        swipeIn: '09:00 AM',
+        swipeOut: '06:00 PM'
+      };
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        if (query.includes('clients')) {
+          callback(null, { id: 1 });
+        } else {
+          callback(null, { id: 1, ...newEntry, swipe_in: '09:00 AM', swipe_out: '06:00 PM', client_name: 'Client A' });
+        }
+      });
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 1;
+        callback.call(this, null);
+      });
+
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send(newEntry);
+
+      expect(response.status).toBe(201);
+      expect(response.body.message).toBe('Work entry created successfully');
+    });
+
+    test('should create work entry without swipe times (WFH)', async () => {
+      const newEntry = {
+        clientId: 1,
+        hours: 8,
+        date: '2024-01-15'
+      };
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        if (query.includes('clients')) {
+          callback(null, { id: 1 });
+        } else {
+          callback(null, { id: 1, ...newEntry, swipe_in: null, swipe_out: null, client_name: 'Client A' });
+        }
+      });
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 1;
+        callback.call(this, null);
+      });
+
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send(newEntry);
+
+      expect(response.status).toBe(201);
+      expect(response.body.message).toBe('Work entry created successfully');
+    });
+
+    test('should return 400 for invalid swipe-in format', async () => {
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({
+          clientId: 1,
+          hours: 5,
+          date: '2024-01-15',
+          swipeIn: '25:00 AM'
+        });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for invalid swipe-out format', async () => {
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({
+          clientId: 1,
+          hours: 5,
+          date: '2024-01-15',
+          swipeOut: 'invalid'
+        });
+
+      expect(response.status).toBe(400);
+    });
+  });
+
+  describe('PUT /api/work-entries/:id - Swipe Times', () => {
+    test('should update swipe-in and swipe-out times', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        if (query.includes('work_entries we')) {
+          callback(null, { id: 1, hours: 9, swipe_in: '10:00 AM', swipe_out: '07:00 PM', client_name: 'Client A' });
+        } else {
+          callback(null, { id: 1 });
+        }
+      });
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      const response = await request(app)
+        .put('/api/work-entries/1')
+        .send({ swipeIn: '10:00 AM', swipeOut: '07:00 PM' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.message).toBe('Work entry updated successfully');
+    });
+
+    test('should clear swipe times by sending empty strings', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        if (query.includes('work_entries we')) {
+          callback(null, { id: 1, hours: 8, swipe_in: null, swipe_out: null, client_name: 'Client A' });
+        } else {
+          callback(null, { id: 1 });
+        }
+      });
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      const response = await request(app)
+        .put('/api/work-entries/1')
+        .send({ swipeIn: '', swipeOut: '' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.message).toBe('Work entry updated successfully');
+    });
+  });
+
+  describe('GET /api/work-entries - Swipe Times', () => {
+    test('should return work entries with swipe_in and swipe_out fields', async () => {
+      const mockEntries = [
+        { id: 1, client_id: 1, hours: 9, description: 'Office', date: '2024-01-15', swipe_in: '09:00 AM', swipe_out: '06:00 PM', client_name: 'Client A' },
+        { id: 2, client_id: 1, hours: 8, description: 'WFH', date: '2024-01-16', swipe_in: null, swipe_out: null, client_name: 'Client A' }
+      ];
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, mockEntries);
+      });
+
+      const response = await request(app).get('/api/work-entries');
+
+      expect(response.status).toBe(200);
+      expect(response.body.workEntries[0]).toHaveProperty('swipe_in', '09:00 AM');
+      expect(response.body.workEntries[0]).toHaveProperty('swipe_out', '06:00 PM');
+      expect(response.body.workEntries[1]).toHaveProperty('swipe_in', null);
+      expect(response.body.workEntries[1]).toHaveProperty('swipe_out', null);
     });
   });
 });
