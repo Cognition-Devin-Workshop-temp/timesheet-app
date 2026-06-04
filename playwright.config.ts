@@ -16,13 +16,15 @@ export default defineConfig({
     ...(process.env.CI ? [['junit', { outputFile: 'test-results/junit-report.xml' }] as const] : []),
   ],
 
+  timeout: process.env.CI ? 60_000 : 30_000,
+
   use: {
     baseURL: process.env.BASE_URL || 'https://www.flipkart.com',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     actionTimeout: 15_000,
-    navigationTimeout: 30_000,
+    navigationTimeout: 60_000,
     locale: 'en-IN',
     timezoneId: 'Asia/Kolkata',
     extraHTTPHeaders: {

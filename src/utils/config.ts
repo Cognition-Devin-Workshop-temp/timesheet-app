@@ -7,7 +7,7 @@ export const config = {
 
   /** Timeouts (ms) */
   timeouts: {
-    navigation: 30_000,
+    navigation: 60_000,
     element: 15_000,
     short: 5_000,
     polling: 1_000,

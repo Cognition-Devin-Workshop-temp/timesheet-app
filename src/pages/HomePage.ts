@@ -16,7 +16,7 @@ export class HomePage extends BasePage {
 
   constructor(page: Page) {
     super(page);
-    this.searchInput = page.locator('input[name="q"], input[title="Search for Products, Brands and More"]');
+    this.searchInput = page.locator('input[name="q"], input[title="Search for Products, Brands and More"]').first();
     this.searchButton = page.locator('button[type="submit"], button:has(svg)').first();
     this.logo = page.locator('a[title="Flipkart"], img[alt="Flipkart"]').first();
     this.cartIcon = page.locator('a[href="/viewcart"]').first();

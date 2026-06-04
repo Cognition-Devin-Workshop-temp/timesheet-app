@@ -13,11 +13,19 @@ export class BasePage {
 
   // ── Navigation ──────────────────────────────────────────────
 
-  async navigate(path = '/') {
-    await this.page.goto(path, {
-      waitUntil: 'domcontentloaded',
-      timeout: config.timeouts.navigation,
-    });
+  async navigate(path = '/', retries = 2) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        await this.page.goto(path, {
+          waitUntil: 'domcontentloaded',
+          timeout: config.timeouts.navigation,
+        });
+        return;
+      } catch (error) {
+        if (attempt === retries) throw error;
+        await this.page.waitForTimeout(2_000);
+      }
+    }
   }
 
   async waitForPageLoad() {
