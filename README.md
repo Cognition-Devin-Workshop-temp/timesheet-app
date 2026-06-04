@@ -11,14 +11,15 @@ A full-stack web application for tracking and reporting employee hourly work acr
 - For production use, modify `backend/src/database/init.js` to use file-based SQLite instead of `:memory:`
 
 ### Authentication
-- Email-only authentication with JWT tokens
-- No password required - assumes trusted internal network
-- Anyone with a valid email can create an account and log in
-- Consider integrating with company SSO for production use
+- Password-based authentication with bcrypt hashing and JWT tokens
+- Users must register with an email and password (minimum 8 characters)
+- Login requires valid credentials — no auto-account creation
+- Auth endpoints are rate-limited (5 attempts per 15 minutes per IP)
+- JWT tokens expire after 24 hours (configurable via `JWT_EXPIRY`)
 
 ## Features
 
-- ✅ User authentication (email-based with JWT tokens)
+- ✅ User authentication (password-based with bcrypt + JWT tokens)
 - ✅ Add, edit, and delete clients
 - ✅ Add, edit, and delete hourly work entries for each client
 - ✅ View hourly reports for each client
@@ -37,7 +38,9 @@ A full-stack web application for tracking and reporting employee hourly work acr
 ### Backend
 - **Node.js** with Express
 - **SQLite** in-memory database
+- **bcrypt** for password hashing
 - **JWT** for authentication
+- **dotenv** for environment variable loading
 - **Joi** for validation
 - **PDFKit** for PDF generation
 - **csv-writer** for CSV export
@@ -112,8 +115,11 @@ cp .env.example .env
 PORT=3001
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
-JWT_SECRET=your-secure-secret-key-change-this
+JWT_SECRET=your-secure-secret-key-change-this  # Generate via: openssl rand -base64 32
+JWT_EXPIRY=24h
 ```
+
+> **Important:** Use a strong, random `JWT_SECRET` in production. Generate one with `openssl rand -base64 32`.
 
 5. Start the development server:
 ```bash
@@ -154,14 +160,16 @@ Frontend will be running at `http://localhost:5173`
 ## Usage
 
 1. Open `http://localhost:5173` in your browser
-2. Enter any email address to log in (no password required)
-3. Start adding clients and tracking work hours
-4. View reports and export data as CSV or PDF
+2. Click **"Don't have an account? Register"** to create a new account with email and password
+3. Log in with your registered credentials
+4. Start adding clients and tracking work hours
+5. View reports and export data as CSV or PDF
 
 ## API Endpoints
 
 ### Authentication
-- `POST /api/auth/login` - Login with email, returns JWT token
+- `POST /api/auth/register` - Register with `{ email, password }`, returns JWT token
+- `POST /api/auth/login` - Login with `{ email, password }`, returns JWT token
 - `GET /api/auth/me` - Get current user info (requires auth)
 
 ### Clients
@@ -220,7 +228,7 @@ npm run test:watch          # Run tests in watch mode
 
 ### Test Coverage
 
-The backend has comprehensive test coverage with **161 tests** across 8 test suites:
+The backend has comprehensive test coverage with **167 tests** across 8 test suites:
 
 | File | Statements | Branches | Functions | Lines |
 |------|------------|----------|-----------|-------|
@@ -267,12 +275,12 @@ See `backend/DEPLOYMENT.md` for detailed production deployment instructions.
 - [ ] Configure proper logging and monitoring
 - [ ] Set up automated backups (if using persistent storage)
 - [ ] Review and adjust rate limiting settings
-- [ ] Consider integrating with company SSO
+- [ ] Consider integrating with company SSO (auth already uses JWT, so SSO integration is straightforward)
 
 ## Known Limitations
 
 1. **In-memory database** - All data is lost on server restart
-2. **Email-only auth** - No password protection, assumes trusted network
+2. **In-memory rate limiting** - Rate limit state resets on server restart
 3. **No user roles** - All users have equal access to all data
 4. **Single-server architecture** - Not designed for horizontal scaling
 5. **No real-time updates** - Changes require page refresh
@@ -280,6 +288,7 @@ See `backend/DEPLOYMENT.md` for detailed production deployment instructions.
 ## Future Enhancements
 
 - Persistent database storage
+- Password reset / forgot password flow
 - User roles and permissions
 - Multi-tenancy support
 - Real-time updates with WebSockets

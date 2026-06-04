@@ -1,55 +1,129 @@
 const express = require('express');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const { getDatabase } = require('../database/init');
-const { emailSchema } = require('../validation/schemas');
+const { loginSchema, registerSchema } = require('../validation/schemas');
 const { authenticateUser } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Login endpoint - creates user if doesn't exist
-router.post('/login', async (req, res, next) => {
+const SALT_ROUNDS = 10;
+
+// Register endpoint
+router.post('/register', async (req, res, next) => {
   try {
-    const { error, value } = emailSchema.validate(req.body);
+    const { error, value } = registerSchema.validate(req.body);
     if (error) {
       return next(error);
     }
 
-    const { email } = value;
+    const { email, password } = value;
     const db = getDatabase();
 
-    // Check if user exists
-    db.get('SELECT email, created_at FROM users WHERE email = ?', [email], (err, row) => {
+    db.get('SELECT email FROM users WHERE email = ?', [email], async (err, row) => {
       if (err) {
         console.error('Database error:', err);
         return res.status(500).json({ error: 'Internal server error' });
       }
 
       if (row) {
-        // User exists
-        return res.json({
-          message: 'Login successful',
-          user: {
-            email: row.email,
-            createdAt: row.created_at
-          }
-        });
-      } else {
-        // Create new user
-        db.run('INSERT INTO users (email) VALUES (?)', [email], function(err) {
-          if (err) {
-            console.error('Error creating user:', err);
-            return res.status(500).json({ error: 'Failed to create user' });
-          }
+        return res.status(409).json({ error: 'Email already registered' });
+      }
 
-          res.status(201).json({
-            message: 'User created and logged in successfully',
-            user: {
-              email: email,
-              createdAt: new Date().toISOString()
+      try {
+        const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+
+        db.run(
+          'INSERT INTO users (email, password_hash) VALUES (?, ?)',
+          [email, passwordHash],
+          function (err) {
+            if (err) {
+              console.error('Error creating user:', err);
+              return res.status(500).json({ error: 'Failed to create user' });
             }
-          });
-        });
+
+            if (!process.env.JWT_SECRET) {
+              console.error('JWT_SECRET is not set');
+              return res.status(500).json({ error: 'Internal server error' });
+            }
+
+            const token = jwt.sign({ email }, process.env.JWT_SECRET, {
+              expiresIn: process.env.JWT_EXPIRY || '24h',
+            });
+
+            res.status(201).json({
+              message: 'User registered successfully',
+              token,
+              user: {
+                email,
+                createdAt: new Date().toISOString(),
+              },
+            });
+          }
+        );
+      } catch (hashError) {
+        console.error('Error hashing password:', hashError);
+        return res.status(500).json({ error: 'Internal server error' });
       }
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Login endpoint
+router.post('/login', async (req, res, next) => {
+  try {
+    const { error, value } = loginSchema.validate(req.body);
+    if (error) {
+      return next(error);
+    }
+
+    const { email, password } = value;
+    const db = getDatabase();
+
+    db.get(
+      'SELECT email, password_hash, created_at FROM users WHERE email = ?',
+      [email],
+      async (err, row) => {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'Internal server error' });
+        }
+
+        if (!row) {
+          return res.status(401).json({ error: 'Invalid email or password' });
+        }
+
+        try {
+          const isValid = await bcrypt.compare(password, row.password_hash);
+          if (!isValid) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+          }
+
+          if (!process.env.JWT_SECRET) {
+            console.error('JWT_SECRET is not set');
+            return res.status(500).json({ error: 'Internal server error' });
+          }
+
+          const token = jwt.sign({ email }, process.env.JWT_SECRET, {
+            expiresIn: process.env.JWT_EXPIRY || '24h',
+          });
+
+          res.json({
+            message: 'Login successful',
+            token,
+            user: {
+              email: row.email,
+              createdAt: row.created_at,
+            },
+          });
+        } catch (compareError) {
+          console.error('Error comparing password:', compareError);
+          return res.status(500).json({ error: 'Internal server error' });
+        }
+      }
+    );
   } catch (error) {
     next(error);
   }
@@ -58,24 +132,28 @@ router.post('/login', async (req, res, next) => {
 // Get current user info
 router.get('/me', authenticateUser, (req, res) => {
   const db = getDatabase();
-  
-  db.get('SELECT email, created_at FROM users WHERE email = ?', [req.userEmail], (err, row) => {
-    if (err) {
-      console.error('Database error:', err);
-      return res.status(500).json({ error: 'Internal server error' });
-    }
 
-    if (!row) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    res.json({
-      user: {
-        email: row.email,
-        createdAt: row.created_at
+  db.get(
+    'SELECT email, created_at FROM users WHERE email = ?',
+    [req.userEmail],
+    (err, row) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
       }
-    });
-  });
+
+      if (!row) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      res.json({
+        user: {
+          email: row.email,
+          createdAt: row.created_at,
+        },
+      });
+    }
+  );
 });
 
 module.exports = router;
