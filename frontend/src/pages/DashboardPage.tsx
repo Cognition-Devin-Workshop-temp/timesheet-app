@@ -13,6 +13,7 @@ import {
   Assignment as AssignmentIcon,
   Assessment as AssessmentIcon,
   Add as AddIcon,
+  Group as GroupIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -174,6 +175,14 @@ const DashboardPage: React.FC = () => {
                 fullWidth
               >
                 View Reports
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<GroupIcon />}
+                onClick={() => navigate('/teams')}
+                fullWidth
+              >
+                Team Workload
               </Button>
             </Box>
           </Paper>

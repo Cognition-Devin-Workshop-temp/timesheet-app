@@ -77,3 +77,90 @@ export interface ApiResponse<T> {
   error?: string;
   message?: string;
 }
+
+export type MemberStatus = 'overloaded' | 'at-risk' | 'on-track' | 'underutilized' | 'unknown';
+export type TeamRole = 'manager' | 'member';
+
+export interface Team {
+  id: number;
+  name: string;
+  managerEmail: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TeamListItem extends Team {
+  myRole: TeamRole;
+  memberCount: number;
+}
+
+export interface TeamMember {
+  email: string;
+  displayName: string;
+  weeklyCapacityHours: number;
+  role: TeamRole;
+  joinedAt: string;
+}
+
+export interface TeamMemberWorkload {
+  email: string;
+  displayName: string;
+  role: TeamRole;
+  totalHours: number;
+  entryCount: number;
+  capacityHours: number;
+  utilizationPct: number | null;
+  status: MemberStatus;
+}
+
+export interface TeamWorkloadSummary {
+  totalTeamHours: number;
+  totalTeamCapacity: number;
+  teamUtilizationPct: number;
+  memberCount: number;
+  overloadedCount: number;
+  atRiskCount: number;
+  onTrackCount: number;
+  underutilizedCount: number;
+}
+
+export interface TeamWorkloadResponse {
+  team: { id: number; name: string };
+  period: { startDate: string; endDate: string };
+  summary: TeamWorkloadSummary;
+  members: TeamMemberWorkload[];
+}
+
+export interface ClientBreakdownItem {
+  clientId: number;
+  clientName: string;
+  hours: number;
+  entryCount: number;
+}
+
+export interface MemberBreakdown {
+  email: string;
+  displayName: string;
+  clients: ClientBreakdownItem[];
+}
+
+export interface TeamWorkloadBreakdownResponse {
+  team: { id: number; name: string };
+  period: { startDate: string; endDate: string };
+  breakdown: MemberBreakdown[];
+}
+
+export interface CreateTeamRequest {
+  name: string;
+}
+
+export interface AddTeamMemberRequest {
+  email: string;
+  displayName: string;
+  weeklyCapacityHours?: number;
+}
+
+export interface UpdateTeamMemberRequest {
+  displayName?: string;
+  weeklyCapacityHours?: number;
+}

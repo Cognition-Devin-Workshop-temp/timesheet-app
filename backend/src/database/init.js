@@ -66,11 +66,42 @@ async function initializeDatabase() {
         )
       `);
 
+      // Create teams table
+      database.run(`
+        CREATE TABLE IF NOT EXISTS teams (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          manager_email TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (manager_email) REFERENCES users (email) ON DELETE CASCADE
+        )
+      `);
+
+      // Create team_members table
+      database.run(`
+        CREATE TABLE IF NOT EXISTS team_members (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          team_id INTEGER NOT NULL,
+          user_email TEXT NOT NULL,
+          display_name TEXT NOT NULL,
+          weekly_capacity_hours DECIMAL(5,2) NOT NULL DEFAULT 40.00,
+          role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('manager', 'member')),
+          joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (team_id, user_email),
+          FOREIGN KEY (team_id) REFERENCES teams (id) ON DELETE CASCADE,
+          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
+        )
+      `);
+
       // Create indexes for better performance
       database.run(`CREATE INDEX IF NOT EXISTS idx_clients_user_email ON clients (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_teams_manager_email ON teams (manager_email)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_team_members_team_id ON team_members (team_id)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_team_members_user_email ON team_members (user_email)`);
 
       console.log('Database tables created successfully');
       resolve();
