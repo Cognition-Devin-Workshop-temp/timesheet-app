@@ -4,7 +4,7 @@
 
 - [k6](https://k6.io/) installed (`brew install k6` or `sudo apt install k6`)
 - Backend running on `http://localhost:3001` (or set `BASE_URL` env var)
-- **Important:** Set `RATE_LIMIT_MAX` env var to a high value (e.g., `100000`) when starting the backend for load testing. The default rate limit (100 req/15 min) will cause all tests to fail immediately.
+- **Important:** Set `RATE_LIMIT_MAX` env var to a high value (e.g., `10000000`) when starting the backend for load testing. The default rate limit (100 req/15 min) will cause all tests to fail immediately. The breaking-point test alone can generate over 1M requests.
 
 ## Test Scripts
 
@@ -18,7 +18,7 @@
 
 ```bash
 # Start the backend with a high rate limit for testing
-cd backend && RATE_LIMIT_MAX=100000 node src/server.js
+cd backend && RATE_LIMIT_MAX=10000000 node src/server.js
 
 # In another terminal, run the tests:
 
