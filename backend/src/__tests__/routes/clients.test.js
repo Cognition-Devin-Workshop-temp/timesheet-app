@@ -453,5 +453,128 @@ describe('Client Routes', () => {
 
       expect(response.status).toBe(200);
     });
+
+    test('should update client department', async () => {
+      const updatedClient = { id: 1, name: 'Client', department: 'Engineering' };
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, updatedClient);
+      });
+
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ department: 'Engineering' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.client.department).toBe('Engineering');
+    });
+
+    test('should update client email', async () => {
+      const updatedClient = { id: 1, name: 'Client', email: 'client@example.com' };
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, updatedClient);
+      });
+
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ email: 'client@example.com' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.client.email).toBe('client@example.com');
+    });
+  });
+
+  describe('DELETE /api/clients (delete all)', () => {
+    test('should delete all clients for authenticated user', async () => {
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        callback.call({ changes: 3 }, null);
+      });
+
+      const response = await request(app).delete('/api/clients');
+
+      expect(response.status).toBe(200);
+      expect(response.body.message).toBe('All clients deleted successfully');
+      expect(response.body.deletedCount).toBe(3);
+    });
+
+    test('should return zero deleted count when no clients exist', async () => {
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        callback.call({ changes: 0 }, null);
+      });
+
+      const response = await request(app).delete('/api/clients');
+
+      expect(response.status).toBe(200);
+      expect(response.body.deletedCount).toBe(0);
+    });
+
+    test('should handle database error when deleting all clients', async () => {
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        callback.call(this, new Error('Delete failed'));
+      });
+
+      const response = await request(app).delete('/api/clients');
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Failed to delete clients' });
+    });
+  });
+
+  describe('POST /api/clients - Additional Validation', () => {
+    test('should create client with department and email', async () => {
+      const newClient = {
+        id: 1,
+        name: 'Full Client',
+        description: 'A client',
+        department: 'Sales',
+        email: 'contact@client.com'
+      };
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        callback.call({ lastID: 1 }, null);
+      });
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, newClient);
+      });
+
+      const response = await request(app)
+        .post('/api/clients')
+        .send({
+          name: 'Full Client',
+          description: 'A client',
+          department: 'Sales',
+          email: 'contact@client.com'
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.client.department).toBe('Sales');
+      expect(response.body.client.email).toBe('contact@client.com');
+    });
+
+    test('should return 400 for name exceeding max length', async () => {
+      const response = await request(app)
+        .post('/api/clients')
+        .send({ name: 'A'.repeat(256) });
+
+      expect(response.status).toBe(400);
+    });
   });
 });
