@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "echo \"No tests configured yet\" && exit 0",
+    "test:ci": "echo \"No tests configured yet\" && exit 0"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
