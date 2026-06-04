@@ -62,12 +62,13 @@ test.describe('Work Entries CRUD', () => {
     await page.getByLabel('Description').fill('To be deleted');
     await page.getByRole('button', { name: 'Create' }).click();
     await expect(page.getByRole('dialog')).toBeHidden();
-    await expect(page.getByText('2 hours')).toBeVisible();
+    const row = page.getByRole('row').filter({ hasText: clientName });
+    await expect(row.getByText('2 hours')).toBeVisible();
 
     // Delete it
-    const row = page.getByRole('row').filter({ hasText: clientName });
     await row.getByRole('button').filter({ has: page.locator('[data-testid="DeleteIcon"]') }).click();
 
-    await expect(page.getByText('To be deleted')).toBeHidden();
+    // Verify the row for this client is gone
+    await expect(page.getByRole('row').filter({ hasText: clientName })).toBeHidden();
   });
 });

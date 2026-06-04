@@ -1,8 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { login, createClient, selectClient, uniqueName } from './helpers';
+import { login, createClient, selectClient, uniqueName, fetchAndParsePdf } from './helpers';
 import * as fs from 'fs';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require('pdf-parse');
 
 test.describe('CSV and PDF Export', () => {
   let clientName: string;
@@ -95,37 +93,26 @@ test.describe('CSV and PDF Export', () => {
     const filename = download.suggestedFilename();
     expect(filename).toContain('.pdf');
 
-    // Test 2: Validate PDF content via direct API call
-    const pdfResponse = await page.request.get(
-      `http://localhost:3001/api/reports/export/pdf/${clientId}`,
-      { headers: { 'x-user-email': 'test@example.com' } }
+    // Test 2: Validate PDF content via API with retry
+    const pdf = await fetchAndParsePdf(
+      page,
+      `http://localhost:3001/api/reports/export/pdf/${clientId}`
     );
-    expect(pdfResponse.status()).toBe(200);
-    const pdfBuffer = Buffer.from(await pdfResponse.body());
 
-    // PDF files start with %PDF magic bytes
-    const pdfHeader = pdfBuffer.subarray(0, 5).toString('ascii');
+    // Magic bytes
+    const pdfHeader = pdf.buffer.subarray(0, 5).toString('ascii');
     expect(pdfHeader).toBe('%PDF-');
+    expect(pdf.buffer.length).toBeGreaterThan(500);
 
-    // File should be non-trivial in size (has actual content)
-    expect(pdfBuffer.length).toBeGreaterThan(500);
-
-    // PDF should end with %%EOF marker
-    const pdfTail = pdfBuffer.subarray(-128).toString('ascii');
+    // EOF marker
+    const pdfTail = pdf.buffer.subarray(-128).toString('ascii');
     expect(pdfTail).toContain('%%EOF');
 
-    // Parse PDF and extract text for content validation
-    const filePath = `/tmp/e2e_pdf_${Date.now()}.pdf`;
-    fs.writeFileSync(filePath, pdfBuffer);
-    const pdfData = await pdfParse(pdfBuffer);
-    const pdfText = pdfData.text;
-    expect(pdfText).toContain(clientName);
-    expect(pdfText).toContain('Total Hours');
-    expect(pdfText).toContain('8.00'); // 3 + 5
-    expect(pdfText).toContain('Design review');
-    expect(pdfText).toContain('Implementation');
-
-    // Clean up
-    fs.unlinkSync(filePath);
+    // Text content
+    expect(pdf.text).toContain(clientName);
+    expect(pdf.text).toContain('Total Hours');
+    expect(pdf.text).toContain('8.00'); // 3 + 5
+    expect(pdf.text).toContain('Design review');
+    expect(pdf.text).toContain('Implementation');
   });
 });

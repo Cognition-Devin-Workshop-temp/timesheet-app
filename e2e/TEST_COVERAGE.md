@@ -3,9 +3,9 @@
 **Application:** Timesheet App (React + Node.js/Express)  
 **Test Framework:** Playwright (Chromium)  
 **Test Runner:** `npx playwright test --reporter=list`  
-**Total Tests:** 18  
+**Total Tests:** 31  
 **Status:** All Passing  
-**Last Run:** June 2026 — 50.3s total execution time  
+**Last Run:** June 2026 — 1.5m total execution time  
 
 ---
 
@@ -19,7 +19,10 @@
 | Reports            | `reports.spec.ts`            | 1     | 1      | 0      |
 | Edge Cases         | `edge-cases.spec.ts`         | 6     | 6      | 0      |
 | CSV & PDF Export   | `exports.spec.ts`            | 2     | 2      | 0      |
-| **Total**          |                              | **18**| **18** | **0**  |
+| PDF Layout         | `pdf-layout.spec.ts`         | 1     | 1      | 0      |
+| Multi-User         | `multi-user.spec.ts`         | 5     | 5      | 0      |
+| Sessions           | `sessions.spec.ts`           | 7     | 7      | 0      |
+| **Total**          |                              | **31**| **31** | **0**  |
 
 ---
 
@@ -127,16 +130,60 @@ HTML report: `npx playwright show-report` (generated in `e2e/playwright-report/`
 
 ---
 
+### 7. PDF Layout Validation (`pdf-layout.spec.ts`)
+
+| # | Test Name | What It Covers | Pages | API Endpoints | Assertions |
+|---|-----------|---------------|-------|---------------|------------|
+| 19 | Correct layout, content, metadata, and headers | Full PDF structure validation via parsed text | `/work-entries`, `/clients` | `GET /api/reports/export/pdf/:clientId` | - Title: "Time Report for" + client name<br>- Total Hours: 7.50 (2+4+1.5)<br>- Total Entries: 3<br>- Table headers: Date, Hours, Description<br>- All 3 entry descriptions present<br>- "Generated:" timestamp present<br>- PDFKit Creator/Producer metadata<br>- Exactly 1 page<br>- `Content-Type: application/pdf`<br>- `Content-Disposition: attachment; *.pdf` |
+
+**Backend routes covered:** `GET /api/reports/export/pdf/:clientId`  
+**Validation approach:** `fetchAndParsePdf()` helper with retry (3 attempts, increasing backoff) to handle transient PDF stream corruption under concurrent load  
+**Prerequisite:** 1 client + 3 work entries (2h "Morning standup", 4h "Feature development", 1.5h "Code review")
+
+---
+
+### 8. Multi-User Data Isolation (`multi-user.spec.ts`)
+
+| # | Test Name | What It Covers | Pages | API Endpoints | Assertions |
+|---|-----------|---------------|-------|---------------|------------|
+| 20 | User A clients not visible to User B | UI-level client isolation via login/logout | `/clients`, `/login` | `GET /api/clients` | - User A creates client → visible<br>- Logout + login as B → client hidden |
+| 21 | User B clients not visible to User A | Reverse direction isolation | `/clients`, `/login` | `GET /api/clients` | - User B creates client → visible<br>- Switch to User A → client hidden |
+| 22 | Work entries isolated per user (API) | API-level work entry isolation | — | `POST /api/clients`, `POST /api/work-entries`, `GET /api/clients`, `GET /api/work-entries` | - User A creates client+entry<br>- User B sees 0 matching clients/entries |
+| 23 | Reports only show authenticated user's data | Report endpoint returns 404 for other user's client | — | `POST /api/clients`, `POST /api/work-entries`, `GET /api/reports/client/:id` | - User A report: totalHours=10<br>- User B: 404 for User A's client |
+| 24 | Cannot delete another user's client | Cross-user deletion blocked | — | `POST /api/clients`, `DELETE /api/clients/:id`, `GET /api/clients/:id` | - User B DELETE → 404<br>- User A GET → 200 (still exists) |
+
+**Security coverage:** Verifies `WHERE user_email = ?` clause in all SQL queries  
+**Auth mechanism tested:** `x-user-email` header-based per-user isolation
+
+---
+
+### 9. Multiple Sessions (`sessions.spec.ts`)
+
+| # | Test Name | What It Covers | Pages | API Endpoints | Assertions |
+|---|-----------|---------------|-------|---------------|------------|
+| 25 | Session persists after page reload | localStorage-based session persistence | `/login` → `/dashboard` | `POST /api/auth/login`, `GET /api/auth/me` | - Login, reload → still on dashboard<br>- Email still visible in app bar |
+| 26 | Session persists across navigation | Session maintained through page navigation | `/clients`, `/work-entries`, `/reports`, `/dashboard` | — | - Navigate all 4 pages → email visible on each |
+| 27 | Logout clears session and redirects | Logout flow via Logout button | `/dashboard` → `/login` | — | - Click Logout → redirected to /login<br>- "Time Tracker" heading visible<br>- Email input visible |
+| 28 | Protected pages redirect after logout | Auth guard on protected routes | `/clients` | — | - After logout, navigate to /clients<br>- Redirected to /login |
+| 29 | Re-login after logout | Sequential login as different users | `/login` → `/dashboard` | `POST /api/auth/login` | - Login as user1 → logout → login as user2<br>- user2 email visible, user1 hidden |
+| 30 | Data context after user switching | Full user switch preserves isolation | `/clients`, `/login` | `POST /api/clients`, `GET /api/clients` | - User1 creates client → switch to User2<br>- User2 sees own client, not User1's<br>- Switch back → User1 sees own client |
+| 31 | Concurrent browser contexts | Parallel sessions in isolated contexts | `/clients`, `/login` | `POST /api/clients`, `GET /api/clients` | - Two browser contexts with different users<br>- Each creates a client<br>- Neither sees the other's client |
+
+**Frontend components covered:** `AuthContext.tsx` (login/logout/localStorage), `Layout.tsx` (Logout button, email display)  
+**Browser features tested:** localStorage persistence, page reload, browser context isolation
+
+---
+
 ## Page Coverage Matrix
 
 | Page               | Component File              | Covered By                                  |
 |--------------------|-----------------------------|---------------------------------------------|
-| Login              | `LoginPage.tsx`             | `login.spec.ts` (3 tests)                   |
+| Login              | `LoginPage.tsx`             | `login.spec.ts` (3), `multi-user.spec.ts` (2), `sessions.spec.ts` (7) |
 | Dashboard          | `DashboardPage.tsx`         | Visited via login redirect (all suites)      |
-| Clients            | `ClientsPage.tsx`           | `clients.spec.ts` (3) + `edge-cases.spec.ts` (3) |
-| Work Entries       | `WorkEntriesPage.tsx`       | `work-entries.spec.ts` (3) + `edge-cases.spec.ts` (3) |
-| Reports            | `ReportsPage.tsx`           | `reports.spec.ts` (1) + `exports.spec.ts` (2) |
-| Layout / Nav       | `Layout.tsx`                | Navigation used in all test suites           |
+| Clients            | `ClientsPage.tsx`           | `clients.spec.ts` (3), `edge-cases.spec.ts` (3), `multi-user.spec.ts` (3), `sessions.spec.ts` (2) |
+| Work Entries       | `WorkEntriesPage.tsx`       | `work-entries.spec.ts` (3), `edge-cases.spec.ts` (3), `pdf-layout.spec.ts` (1) |
+| Reports            | `ReportsPage.tsx`           | `reports.spec.ts` (1), `exports.spec.ts` (2) |
+| Layout / Nav       | `Layout.tsx`                | Navigation used in all suites, `sessions.spec.ts` (logout) |
 
 ---
 
@@ -156,7 +203,7 @@ HTML report: `npx playwright show-report` (generated in `e2e/playwright-report/`
 | `DELETE` | `/api/work-entries/:id`           | `work-entries.spec.ts`            | Confirm dialog |
 | `GET`    | `/api/reports/client/:clientId`   | `reports.spec.ts`                 | Aggregation accuracy |
 | `GET`    | `/api/reports/export/csv/:id`     | `exports.spec.ts`                 | Content headers, data rows, hours, descriptions |
-| `GET`    | `/api/reports/export/pdf/:id`     | `exports.spec.ts`                 | Magic bytes, text extraction, hours, descriptions |
+| `GET`    | `/api/reports/export/pdf/:id`     | `exports.spec.ts`, `pdf-layout.spec.ts`  | Magic bytes, text, layout, metadata, headers |
 
 ---
 
@@ -186,9 +233,10 @@ HTML report: `npx playwright show-report` (generated in `e2e/playwright-report/`
 | Helper Function     | Description                                          | Used By |
 |---------------------|------------------------------------------------------|---------|
 | `login(page, email)` | Navigates to `/login`, fills email, submits, waits for `/dashboard` | All test suites (beforeEach) |
-| `createClient(page, name, opts)` | Creates a client via UI with optional department/email/description | `work-entries.spec.ts`, `reports.spec.ts`, `edge-cases.spec.ts`, `exports.spec.ts` |
-| `selectClient(page, clientName)` | Opens MUI combobox in dialog and selects a client by name | `work-entries.spec.ts`, `reports.spec.ts`, `edge-cases.spec.ts`, `exports.spec.ts` |
+| `createClient(page, name, opts)` | Creates a client via UI with optional department/email/description | Most test suites including `multi-user.spec.ts`, `sessions.spec.ts`, `pdf-layout.spec.ts` |
+| `selectClient(page, clientName)` | Opens MUI combobox in dialog and selects a client by name | `work-entries.spec.ts`, `reports.spec.ts`, `edge-cases.spec.ts`, `exports.spec.ts`, `pdf-layout.spec.ts` |
 | `uniqueName(prefix)` | Generates unique names with timestamp + random suffix | All test suites |
+| `fetchAndParsePdf(page, url, email)` | Fetches PDF via API with retry (3 attempts, backoff) and parses with pdf-parse | `exports.spec.ts`, `pdf-layout.spec.ts` |
 | `deleteAllClients(page)` | Bulk delete utility (available but not actively used) | — |
 
 ---
@@ -199,8 +247,7 @@ HTML report: `npx playwright show-report` (generated in `e2e/playwright-report/`
 |-----------------------------------|-------------------------------------------------------|
 
 | Dashboard page content            | Page is visited (login redirect) but no specific widget assertions |
-| Multiple user isolation           | All tests use single user `test@example.com`          |
-| Concurrent session testing        | Single-browser, sequential execution                  |
+
 | Mobile/responsive layout          | Tests run in default Chromium viewport only            |
 | Accessibility (a11y) audit        | No axe or similar audit integrated                    |
 | Performance/load testing          | Out of scope for e2e functional tests                 |

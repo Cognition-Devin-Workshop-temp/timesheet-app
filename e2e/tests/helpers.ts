@@ -43,3 +43,30 @@ export async function deleteAllClients(page: Page) {
 export function uniqueName(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require('pdf-parse');
+
+/** Fetch a PDF via API and parse it, retrying up to 3 times to handle transient stream corruption under load */
+export async function fetchAndParsePdf(
+  page: Page,
+  url: string,
+  email = 'test@example.com'
+): Promise<{ text: string; numpages: number; info: Record<string, string>; buffer: Buffer; headers: Record<string, string> }> {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const resp = await page.request.get(url, {
+      headers: { 'x-user-email': email },
+    });
+    const buffer = Buffer.from(await resp.body());
+    try {
+      const data = await pdfParse(buffer);
+      return { text: data.text, numpages: data.numpages, info: data.info, buffer, headers: resp.headers() };
+    } catch (err) {
+      lastError = err as Error;
+      // Wait before retrying (increasing backoff)
+      await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+    }
+  }
+  throw lastError;
+}
