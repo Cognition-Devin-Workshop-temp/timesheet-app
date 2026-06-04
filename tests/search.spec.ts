@@ -36,7 +36,7 @@ test.describe('Flipkart Search Functionality', () => {
     // Either shows "no results" or a fallback list — both are acceptable
     const noResults = await searchResultsPage.hasNoResults();
     const count = await searchResultsPage.getResultCount();
-    expect(noResults || count >= 0).toBeTruthy();
+    expect(noResults || count > 0).toBeTruthy();
   });
 
   test('should sort search results by price low to high', async ({

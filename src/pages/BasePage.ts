@@ -96,9 +96,10 @@ export class BasePage {
   }
 
   /** Switch to a newly opened tab and return its Page. */
-  async switchToNewTab(): Promise<Page> {
+  async switchToNewTab(triggerAction: () => Promise<void>): Promise<Page> {
     const [newPage] = await Promise.all([
       this.page.context().waitForEvent('page'),
+      triggerAction(),
     ]);
     await newPage.waitForLoadState('domcontentloaded');
     return newPage;
