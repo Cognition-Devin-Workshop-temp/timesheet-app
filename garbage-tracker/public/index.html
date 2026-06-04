@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Garbage Tracker</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <div class="header-content">
+      <h1>🗑️ Garbage Tracker</h1>
+      <p class="subtitle">Report and track garbage locations in your area</p>
+    </div>
+    <nav>
+      <button class="nav-btn active" data-view="dashboard">Dashboard</button>
+      <button class="nav-btn" data-view="map">Map View</button>
+      <button class="nav-btn" data-view="report">Report Garbage</button>
+      <button class="nav-btn" data-view="list">All Reports</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Dashboard View -->
+    <section id="dashboard-view" class="view active">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-number" id="stat-total">0</div>
+          <div class="stat-label">Total Reports</div>
+        </div>
+        <div class="stat-card stat-reported">
+          <div class="stat-number" id="stat-reported">0</div>
+          <div class="stat-label">Reported</div>
+        </div>
+        <div class="stat-card stat-progress">
+          <div class="stat-number" id="stat-progress">0</div>
+          <div class="stat-label">In Progress</div>
+        </div>
+        <div class="stat-card stat-cleaned">
+          <div class="stat-number" id="stat-cleaned">0</div>
+          <div class="stat-label">Cleaned</div>
+        </div>
+      </div>
+      <div class="dashboard-row">
+        <div class="card">
+          <h3>This Week</h3>
+          <p><span id="stat-week">0</span> new reports</p>
+          <p><span id="stat-week-cleaned">0</span> cleaned up</p>
+        </div>
+        <div class="card">
+          <h3>By Severity</h3>
+          <div id="severity-breakdown"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Recent Reports</h3>
+        <div id="recent-reports"></div>
+      </div>
+    </section>
+
+    <!-- Map View -->
+    <section id="map-view" class="view">
+      <div id="map"></div>
+    </section>
+
+    <!-- Report Form -->
+    <section id="report-view" class="view">
+      <div class="form-container">
+        <h2>Report Garbage Location</h2>
+        <form id="report-form">
+          <div class="form-group">
+            <label>Location</label>
+            <div class="location-row">
+              <input type="number" id="latitude" name="latitude" placeholder="Latitude" step="any" required />
+              <input type="number" id="longitude" name="longitude" placeholder="Longitude" step="any" required />
+              <button type="button" id="get-location-btn" class="btn btn-secondary">📍 Use My Location</button>
+            </div>
+            <input type="text" id="address" name="address" placeholder="Address (optional)" />
+          </div>
+
+          <div class="form-group">
+            <label for="description">Description *</label>
+            <textarea id="description" name="description" rows="3" placeholder="Describe the garbage (type, amount, condition...)" required></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="severity">Severity</label>
+            <select id="severity" name="severity">
+              <option value="low">Low - Small amount of litter</option>
+              <option value="medium" selected>Medium - Noticeable garbage pile</option>
+              <option value="high">High - Large dump / hazardous</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="photo">Photo (optional)</label>
+            <input type="file" id="photo" name="photo" accept="image/*" />
+            <div id="photo-preview"></div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="reporter_name">Your Name (optional)</label>
+              <input type="text" id="reporter_name" name="reporter_name" placeholder="Name" />
+            </div>
+            <div class="form-group">
+              <label for="reporter_email">Your Email (optional)</label>
+              <input type="email" id="reporter_email" name="reporter_email" placeholder="Email" />
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary">Submit Report</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- List View -->
+    <section id="list-view" class="view">
+      <div class="list-header">
+        <h2>All Reports</h2>
+        <div class="filters">
+          <select id="filter-status">
+            <option value="">All Statuses</option>
+            <option value="reported">Reported</option>
+            <option value="in_progress">In Progress</option>
+            <option value="cleaned">Cleaned</option>
+            <option value="invalid">Invalid</option>
+          </select>
+          <select id="filter-severity">
+            <option value="">All Severities</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+      </div>
+      <div id="reports-list"></div>
+    </section>
+  </main>
+
+  <!-- Status Update Modal -->
+  <div id="status-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Update Status</h3>
+      <input type="hidden" id="modal-report-id" />
+      <select id="modal-status">
+        <option value="reported">Reported</option>
+        <option value="in_progress">In Progress</option>
+        <option value="cleaned">Cleaned</option>
+        <option value="invalid">Invalid</option>
+      </select>
+      <textarea id="modal-notes" placeholder="Notes (optional)" rows="2"></textarea>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
+        <button class="btn btn-primary" id="modal-save">Update</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
