@@ -1,0 +1,11 @@
+export const PLAYER_SPEED = 0.15
+export const PLAYER_INERTIA = 0.92
+export const LASER_SPEED = 1.2
+export const ENEMY_SPEED = 0.08
+export const ENEMY_SPAWN_RATE = 60 // frames between spawns
+export const BOUNDS_X = 12
+export const BOUNDS_Y = 8
+export const DAMAGE_PER_HIT = 15
+export const SCORE_PER_KILL = 100
+export const MAX_LASERS = 30
+export const MAX_ENEMIES = 15
