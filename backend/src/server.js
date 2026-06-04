@@ -1,10 +1,14 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const session = require('express-session');
 
 const authRoutes = require('./routes/auth');
+const oidcRoutes = require('./routes/oidc');
 const clientRoutes = require('./routes/clients');
 const workEntryRoutes = require('./routes/workEntries');
 const reportRoutes = require('./routes/reports');
@@ -32,6 +36,14 @@ app.use(limiter);
 // Logging
 app.use(morgan('combined'));
 
+// Session middleware (used for OIDC state/nonce storage)
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'dev-session-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false } // set to true in production with HTTPS
+}));
+
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -43,6 +55,7 @@ app.get('/health', (req, res) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/auth/oidc', oidcRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/work-entries', workEntryRoutes);
 app.use('/api/reports', reportRoutes);

@@ -8,6 +8,7 @@ import {
   Box,
   Alert,
   CircularProgress,
+  Divider,
 } from '@mui/material';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -87,6 +88,17 @@ const LoginPage: React.FC = () => {
             {isLoading ? <CircularProgress size={24} /> : 'Log In'}
           </Button>
         </Box>
+
+        <Divider sx={{ my: 2 }}>OR</Divider>
+
+        <Button
+          fullWidth
+          variant="outlined"
+          href="/api/auth/oidc/login"
+          sx={{ mb: 1 }}
+        >
+          Login with SSO
+        </Button>
       </Paper>
     </Box>
     </Container>
