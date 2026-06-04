@@ -1,0 +1,33 @@
+{
+  "name": "flipkart-playwright-framework",
+  "version": "1.0.0",
+  "description": "Playwright Test Automation Framework for Flipkart (Page Object Model)",
+  "scripts": {
+    "test": "npx playwright test",
+    "test:headed": "npx playwright test --headed",
+    "test:ui": "npx playwright test --ui",
+    "test:debug": "npx playwright test --debug",
+    "test:search": "npx playwright test tests/search.spec.ts",
+    "test:cart": "npx playwright test tests/cart.spec.ts",
+    "test:login": "npx playwright test tests/login.spec.ts",
+    "test:product": "npx playwright test tests/product-detail.spec.ts",
+    "test:chromium": "npx playwright test --project=chromium",
+    "test:firefox": "npx playwright test --project=firefox",
+    "test:webkit": "npx playwright test --project=webkit",
+    "report": "npx playwright show-report",
+    "lint": "eslint 'src/**/*.ts' 'tests/**/*.ts'",
+    "lint:fix": "eslint 'src/**/*.ts' 'tests/**/*.ts' --fix",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "@types/node": "^22.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^8.57.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
