@@ -221,6 +221,35 @@ describe('Work Entry Routes', () => {
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Failed to create work entry' });
     });
+
+    test('should store date as ISO string, not numeric timestamp (regression)', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        if (query.includes('clients')) {
+          callback(null, { id: 1 });
+        } else {
+          callback(null, { id: 1, client_id: 1, hours: 5, description: 'Work', date: '2024-01-15', client_name: 'Client A' });
+        }
+      });
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 1;
+        callback.call(this, null);
+      });
+
+      await request(app)
+        .post('/api/work-entries')
+        .send({
+          clientId: 1,
+          hours: 5,
+          description: 'Work',
+          date: '2024-01-15'
+        });
+
+      const insertParams = mockDb.run.mock.calls[0][1];
+      const dateParam = insertParams[insertParams.length - 1];
+      expect(typeof dateParam).toBe('string');
+      expect(dateParam).toBe('2024-01-15');
+    });
   });
 
   describe('PUT /api/work-entries/:id', () => {
