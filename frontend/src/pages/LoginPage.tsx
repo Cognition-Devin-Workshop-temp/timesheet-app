@@ -8,15 +8,18 @@ import {
   Box,
   Alert,
   CircularProgress,
+  Link,
 } from '@mui/material';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const { login, register } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -25,14 +28,29 @@ const LoginPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await login(email);
+      if (isRegisterMode) {
+        await register(email, password);
+      } else {
+        await login(email, password);
+      }
       navigate('/dashboard');
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Login failed. Please try again.');
+      const error = err as { response?: { data?: { error?: string }; status?: number } };
+      if (error.response?.status === 409) {
+        setError('An account with this email already exists. Please log in instead.');
+      } else if (error.response?.status === 401) {
+        setError('Invalid email or password.');
+      } else {
+        setError(error.response?.data?.error || 'An error occurred. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const toggleMode = () => {
+    setIsRegisterMode(!isRegisterMode);
+    setError('');
   };
 
   return (
@@ -51,11 +69,8 @@ const LoginPage: React.FC = () => {
           Time Tracker
         </Typography>
         <Typography variant="body2" align="center" color="text.secondary" sx={{ mb: 2 }}>
-          Enter your email to log in
+          {isRegisterMode ? 'Create a new account' : 'Sign in to your account'}
         </Typography>
-        <Alert severity="info" sx={{ mb: 2 }}>
-          This app intentionally does not have a password field.
-        </Alert>
         
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -77,15 +92,42 @@ const LoginPage: React.FC = () => {
             onChange={(e) => setEmail(e.target.value)}
             disabled={isLoading}
           />
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="password"
+            label="Password"
+            name="password"
+            type="password"
+            autoComplete={isRegisterMode ? 'new-password' : 'current-password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={isLoading}
+            helperText={isRegisterMode ? 'Minimum 8 characters' : undefined}
+          />
           <Button
             type="submit"
             fullWidth
             variant="contained"
             sx={{ mt: 2, mb: 1 }}
-            disabled={isLoading || !email}
+            disabled={isLoading || !email || !password}
           >
-            {isLoading ? <CircularProgress size={24} /> : 'Log In'}
+            {isLoading ? <CircularProgress size={24} /> : (isRegisterMode ? 'Register' : 'Log In')}
           </Button>
+          <Box sx={{ textAlign: 'center', mt: 1 }}>
+            <Link
+              component="button"
+              type="button"
+              variant="body2"
+              onClick={toggleMode}
+              underline="hover"
+            >
+              {isRegisterMode
+                ? 'Already have an account? Log in'
+                : "Don't have an account? Register"}
+            </Link>
+          </Box>
         </Box>
       </Paper>
     </Box>
