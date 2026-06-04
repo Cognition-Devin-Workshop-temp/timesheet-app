@@ -13,14 +13,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const storedEmail = localStorage.getItem('userEmail');
+      const storedToken = localStorage.getItem('authToken');
       
-      if (storedEmail) {
+      if (storedToken) {
         try {
           const response = await apiClient.getCurrentUser();
           setUser(response.user);
         } catch (error) {
           console.error('Auth check failed:', error);
+          localStorage.removeItem('authToken');
           localStorage.removeItem('userEmail');
         }
       }
@@ -33,8 +34,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string) => {
     try {
       const response = await apiClient.login(email);
-      setUser(response.user);
+      localStorage.setItem('authToken', response.token);
       localStorage.setItem('userEmail', email);
+      setUser(response.user);
     } catch (error) {
       console.error('Login failed:', error);
       throw error;
@@ -43,6 +45,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = () => {
     setUser(null);
+    localStorage.removeItem('authToken');
     localStorage.removeItem('userEmail');
   };
 

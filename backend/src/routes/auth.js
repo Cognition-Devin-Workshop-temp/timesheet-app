@@ -1,4 +1,5 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const { getDatabase } = require('../database/init');
 const { emailSchema } = require('../validation/schemas');
 const { authenticateUser } = require('../middleware/auth');
@@ -25,8 +26,10 @@ router.post('/login', async (req, res, next) => {
 
       if (row) {
         // User exists
+        const token = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '24h' });
         return res.json({
           message: 'Login successful',
+          token,
           user: {
             email: row.email,
             createdAt: row.created_at
@@ -40,8 +43,10 @@ router.post('/login', async (req, res, next) => {
             return res.status(500).json({ error: 'Failed to create user' });
           }
 
+          const token = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '24h' });
           res.status(201).json({
             message: 'User created and logged in successfully',
+            token,
             user: {
               email: email,
               createdAt: new Date().toISOString()
