@@ -33,7 +33,7 @@ import { type Client } from '../types/api';
 const ClientsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
-  const [formData, setFormData] = useState({ name: '', description: '', department: '', email: '' });
+  const [formData, setFormData] = useState({ name: '', description: '', department: '', email: '', availableEfforts: '' });
   const [error, setError] = useState('');
 
   const queryClient = useQueryClient();
@@ -44,7 +44,7 @@ const ClientsPage: React.FC = () => {
   });
 
   const createMutation = useMutation({
-    mutationFn: (clientData: { name: string; description?: string; department?: string; email?: string }) =>
+    mutationFn: (clientData: { name: string; description?: string; department?: string; email?: string; availableEfforts?: number | null }) =>
       apiClient.createClient(clientData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
@@ -57,7 +57,7 @@ const ClientsPage: React.FC = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { name?: string; description?: string; department?: string; email?: string } }) =>
+    mutationFn: ({ id, data }: { id: number; data: { name?: string; description?: string; department?: string; email?: string; availableEfforts?: number | null } }) =>
       apiClient.updateClient(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
@@ -100,11 +100,12 @@ const ClientsPage: React.FC = () => {
         name: client.name, 
         description: client.description || '',
         department: client.department || '',
-        email: client.email || ''
+        email: client.email || '',
+        availableEfforts: client.available_efforts != null ? client.available_efforts.toString() : ''
       });
     } else {
       setEditingClient(null);
-      setFormData({ name: '', description: '', department: '', email: '' });
+      setFormData({ name: '', description: '', department: '', email: '', availableEfforts: '' });
     }
     setError('');
     setOpen(true);
@@ -113,7 +114,7 @@ const ClientsPage: React.FC = () => {
   const handleClose = () => {
     setOpen(false);
     setEditingClient(null);
-    setFormData({ name: '', description: '', department: '', email: '' });
+    setFormData({ name: '', description: '', department: '', email: '', availableEfforts: '' });
     setError('');
   };
 
@@ -126,6 +127,12 @@ const ClientsPage: React.FC = () => {
       return;
     }
 
+    const parsedEfforts = formData.availableEfforts ? parseFloat(formData.availableEfforts) : null;
+    if (formData.availableEfforts && (isNaN(parsedEfforts as number) || (parsedEfforts as number) <= 0)) {
+      setError('Available efforts must be a positive number');
+      return;
+    }
+
     if (editingClient) {
       updateMutation.mutate({
         id: editingClient.id,
@@ -134,6 +141,7 @@ const ClientsPage: React.FC = () => {
           description: formData.description || undefined,
           department: formData.department || undefined,
           email: formData.email || undefined,
+          availableEfforts: parsedEfforts,
         },
       });
     } else {
@@ -142,6 +150,7 @@ const ClientsPage: React.FC = () => {
         description: formData.description || undefined,
         department: formData.department || undefined,
         email: formData.email || undefined,
+        availableEfforts: parsedEfforts,
       });
     }
   };
@@ -202,6 +211,7 @@ const ClientsPage: React.FC = () => {
                 <TableCell>Name</TableCell>
                 <TableCell>Department</TableCell>
                 <TableCell>Email</TableCell>
+                <TableCell>Available Efforts (hrs)</TableCell>
                 <TableCell>Description</TableCell>
                 <TableCell>Created</TableCell>
                 <TableCell align="right">Actions</TableCell>
@@ -232,6 +242,13 @@ const ClientsPage: React.FC = () => {
                         </Typography>
                       ) : (
                         <Chip label="-" size="small" variant="outlined" />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {client.available_efforts != null ? (
+                        <Chip label={`${client.available_efforts} hrs`} color="info" variant="outlined" />
+                      ) : (
+                        <Chip label="No limit" size="small" variant="outlined" />
                       )}
                     </TableCell>
                     <TableCell>
@@ -312,6 +329,17 @@ const ClientsPage: React.FC = () => {
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               disabled={createMutation.isPending || updateMutation.isPending}
+            />
+            <TextField
+              margin="dense"
+              label="Available Efforts (hours)"
+              fullWidth
+              type="number"
+              inputProps={{ min: 0, step: 0.01 }}
+              value={formData.availableEfforts}
+              onChange={(e) => setFormData({ ...formData, availableEfforts: e.target.value })}
+              disabled={createMutation.isPending || updateMutation.isPending}
+              helperText="Maximum hours allowed for this client. Leave empty for no limit."
             />
             <TextField
               margin="dense"

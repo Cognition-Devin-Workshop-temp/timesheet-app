@@ -22,6 +22,7 @@ import {
   Chip,
   IconButton,
   Tooltip,
+  LinearProgress,
 } from '@mui/material';
 import {
   PictureAsPdf as PdfIcon,
@@ -29,7 +30,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
-import { type ClientReport } from '../types/api';
+import { type Client, type ClientReport } from '../types/api';
 
 const ReportsPage: React.FC = () => {
   const [selectedClientId, setSelectedClientId] = useState<number>(0);
@@ -46,8 +47,9 @@ const ReportsPage: React.FC = () => {
     enabled: selectedClientId > 0,
   });
 
-  const clients = clientsData?.clients || [];
+  const clients: Client[] = clientsData?.clients || [];
   const report = reportData as ClientReport | undefined;
+  const selectedClientObj = clients.find((c) => c.id === selectedClientId);
 
   const handleExportCsv = async () => {
     if (!selectedClientId) return;
@@ -213,6 +215,52 @@ const ReportsPage: React.FC = () => {
                     </CardContent>
                   </Card>
                 </Grid>
+                {selectedClientObj?.available_efforts != null && (
+                  <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                    <Card>
+                      <CardContent>
+                        <Typography color="textSecondary" gutterBottom>
+                          Available Efforts
+                        </Typography>
+                        <Typography variant="h4" component="div">
+                          {selectedClientObj.available_efforts}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          hours budgeted
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                )}
+                {selectedClientObj?.available_efforts != null && report && (
+                  <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                    <Card>
+                      <CardContent>
+                        <Typography color="textSecondary" gutterBottom>
+                          Utilization
+                        </Typography>
+                        <Typography variant="h4" component="div" color={
+                          (report.totalHours / selectedClientObj.available_efforts) > 1 ? 'error' :
+                          (report.totalHours / selectedClientObj.available_efforts) > 0.9 ? 'warning.main' : 'success.main'
+                        }>
+                          {((report.totalHours / selectedClientObj.available_efforts) * 100).toFixed(1)}%
+                        </Typography>
+                        <LinearProgress
+                          variant="determinate"
+                          value={Math.min((report.totalHours / selectedClientObj.available_efforts) * 100, 100)}
+                          color={
+                            (report.totalHours / selectedClientObj.available_efforts) > 1 ? 'error' :
+                            (report.totalHours / selectedClientObj.available_efforts) > 0.9 ? 'warning' : 'success'
+                          }
+                          sx={{ mt: 1, height: 8, borderRadius: 4 }}
+                        />
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                          {(selectedClientObj.available_efforts - report.totalHours).toFixed(2)} hrs remaining
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                )}
               </Grid>
 
               <Paper>

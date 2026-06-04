@@ -9,6 +9,7 @@ export interface Client {
   description: string | null;
   department: string | null;
   email: string | null;
+  available_efforts: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -40,6 +41,7 @@ export interface CreateClientRequest {
   description?: string;
   department?: string;
   email?: string;
+  availableEfforts?: number | null;
 }
 
 export interface UpdateClientRequest {
@@ -47,6 +49,7 @@ export interface UpdateClientRequest {
   description?: string;
   department?: string;
   email?: string;
+  availableEfforts?: number | null;
 }
 
 export interface CreateWorkEntryRequest {
@@ -70,6 +73,14 @@ export interface LoginRequest {
 export interface LoginResponse {
   message: string;
   user: User;
+}
+
+export interface EffortSummary {
+  clientId: number;
+  clientName: string;
+  availableEfforts: number | null;
+  usedHours: number;
+  remainingHours: number | null;
 }
 
 export interface ApiResponse<T> {

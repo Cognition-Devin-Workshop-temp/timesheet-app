@@ -28,13 +28,14 @@ import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  Warning as WarningIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import apiClient from '../api/client';
-import { type WorkEntry } from '../types/api';
+import { type WorkEntry, type EffortSummary } from '../types/api';
 
 const WorkEntriesPage: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -46,6 +47,7 @@ const WorkEntriesPage: React.FC = () => {
     date: new Date(),
   });
   const [error, setError] = useState('');
+  const [effortSummary, setEffortSummary] = useState<EffortSummary | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -64,6 +66,7 @@ const WorkEntriesPage: React.FC = () => {
       apiClient.createWorkEntry(entryData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workEntries'] });
+      queryClient.invalidateQueries({ queryKey: ['effortSummary'] });
       handleClose();
     },
     onError: (err: unknown) => {
@@ -77,6 +80,7 @@ const WorkEntriesPage: React.FC = () => {
       apiClient.updateWorkEntry(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workEntries'] });
+      queryClient.invalidateQueries({ queryKey: ['effortSummary'] });
       handleClose();
     },
     onError: (err: unknown) => {
@@ -89,6 +93,7 @@ const WorkEntriesPage: React.FC = () => {
     mutationFn: (id: number) => apiClient.deleteWorkEntry(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workEntries'] });
+      queryClient.invalidateQueries({ queryKey: ['effortSummary'] });
     },
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { error?: string } } };
@@ -119,6 +124,12 @@ const WorkEntriesPage: React.FC = () => {
     }
     setError('');
     setOpen(true);
+
+    // Fetch effort summary for the selected client
+    const selectedClientId = entry ? entry.client_id : 0;
+    if (selectedClientId) {
+      apiClient.getEffortSummary(selectedClientId).then(setEffortSummary).catch(() => setEffortSummary(null));
+    }
   };
 
   const handleClose = () => {
@@ -131,6 +142,7 @@ const WorkEntriesPage: React.FC = () => {
       date: new Date(),
     });
     setError('');
+    setEffortSummary(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -295,7 +307,15 @@ const WorkEntriesPage: React.FC = () => {
                 <InputLabel>Client</InputLabel>
                 <Select
                   value={formData.clientId}
-                  onChange={(e) => setFormData({ ...formData, clientId: Number(e.target.value) })}
+                  onChange={(e) => {
+                    const newClientId = Number(e.target.value);
+                    setFormData({ ...formData, clientId: newClientId });
+                    if (newClientId) {
+                      apiClient.getEffortSummary(newClientId).then(setEffortSummary).catch(() => setEffortSummary(null));
+                    } else {
+                      setEffortSummary(null);
+                    }
+                  }}
                   disabled={createMutation.isPending || updateMutation.isPending}
                 >
                   {clients.map((client: { id: number; name: string }) => (
@@ -305,6 +325,21 @@ const WorkEntriesPage: React.FC = () => {
                   ))}
                 </Select>
               </FormControl>
+
+              {effortSummary && effortSummary.availableEfforts != null && (
+                <Alert
+                  severity={effortSummary.remainingHours != null && effortSummary.remainingHours <= 0 ? 'error' : effortSummary.remainingHours != null && effortSummary.remainingHours < effortSummary.availableEfforts * 0.1 ? 'warning' : 'info'}
+                  icon={effortSummary.remainingHours != null && effortSummary.remainingHours <= 0 ? <WarningIcon /> : undefined}
+                  sx={{ mt: 1, mb: 1 }}
+                >
+                  <Typography variant="body2">
+                    <strong>Effort Budget:</strong> {effortSummary.usedHours.toFixed(2)} / {effortSummary.availableEfforts} hrs used
+                    {effortSummary.remainingHours != null && (
+                      <> &mdash; <strong>{effortSummary.remainingHours.toFixed(2)} hrs remaining</strong></>
+                    )}
+                  </Typography>
+                </Alert>
+              )}
 
               <TextField
                 margin="dense"
