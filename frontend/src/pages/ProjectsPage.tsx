@@ -150,7 +150,7 @@ const ProjectsPage: React.FC = () => {
         id: editingProject.id,
         data: {
           name: formData.name,
-          description: formData.description || undefined,
+          description: formData.description,
           status: formData.status,
           clientId: parseInt(formData.clientId),
           startDate: formData.startDate || null,
