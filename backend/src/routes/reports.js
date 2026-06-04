@@ -63,8 +63,15 @@ router.get('/dashboard', (req, res) => {
           // Convert YYYY-WW to a readable date range
           const [year, week] = period.split('-');
           const jan1 = new Date(parseInt(year), 0, 1);
-          const dayOffset = (parseInt(week)) * 7 - jan1.getDay() + 1;
-          const weekStart = new Date(parseInt(year), 0, dayOffset);
+          const jan1Day = jan1.getDay();
+          const firstMondayOffset = jan1Day === 0 ? 1 : (jan1Day === 1 ? 0 : 8 - jan1Day);
+          const weekNum = parseInt(week);
+          let weekStart;
+          if (weekNum === 0) {
+            weekStart = new Date(parseInt(year), 0, 1);
+          } else {
+            weekStart = new Date(parseInt(year), 0, 1 + firstMondayOffset + (weekNum - 1) * 7);
+          }
           const weekEnd = new Date(weekStart);
           weekEnd.setDate(weekEnd.getDate() + 6);
           const opts = { month: 'short', day: 'numeric' };
