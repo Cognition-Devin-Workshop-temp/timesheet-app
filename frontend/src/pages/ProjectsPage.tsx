@@ -164,7 +164,7 @@ const ProjectsPage: React.FC = () => {
 
     const projectData = {
       name: formData.name,
-      description: formData.description || undefined,
+      description: formData.description,
       clientId: formData.clientId,
       startDate: formData.startDate.toISOString().split('T')[0],
       status: formData.status,

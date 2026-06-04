@@ -72,6 +72,8 @@ router.post('/', (req, res, next) => {
     }
 
     const { name, description, clientId, startDate, status } = value;
+    // Normalize startDate (Joi coerces ISO strings into Date objects) to a YYYY-MM-DD string
+    const startDateValue = startDate instanceof Date ? startDate.toISOString().split('T')[0] : startDate;
     const db = getDatabase();
 
     // Verify client exists and belongs to user
@@ -90,7 +92,7 @@ router.post('/', (req, res, next) => {
 
         db.run(
           'INSERT INTO projects (name, description, client_id, user_email, start_date, status) VALUES (?, ?, ?, ?, ?, ?)',
-          [name, description || null, clientId, req.userEmail, startDate, status || 'active'],
+          [name, description || null, clientId, req.userEmail, startDateValue, status || 'active'],
           function(err) {
             if (err) {
               console.error('Database error:', err);
@@ -157,7 +159,7 @@ router.put('/:id', (req, res, next) => {
         }
 
         // If clientId is being updated, verify it belongs to user
-        if (value.clientId) {
+        if (value.clientId !== undefined) {
           db.get(
             'SELECT id FROM clients WHERE id = ? AND user_email = ?',
             [value.clientId, req.userEmail],
@@ -198,8 +200,10 @@ router.put('/:id', (req, res, next) => {
           }
 
           if (value.startDate !== undefined) {
+            // Normalize startDate (Joi coerces ISO strings into Date objects) to a YYYY-MM-DD string
+            const startDateValue = value.startDate instanceof Date ? value.startDate.toISOString().split('T')[0] : value.startDate;
             updates.push('start_date = ?');
-            values.push(value.startDate);
+            values.push(startDateValue);
           }
 
           if (value.status !== undefined) {
