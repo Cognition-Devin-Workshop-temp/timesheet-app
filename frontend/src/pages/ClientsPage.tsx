@@ -285,7 +285,7 @@ const ClientsPage: React.FC = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
+                  <TableCell colSpan={7} align="center">
                     <Typography color="text.secondary" sx={{ py: 3 }}>
                       No clients found. Create your first client to get started.
                     </Typography>
