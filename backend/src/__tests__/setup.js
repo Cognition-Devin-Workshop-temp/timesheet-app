@@ -1,3 +1,14 @@
+// Mock logger globally to keep test output clean
+jest.mock('../lib/logger', () => ({
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  fatal: jest.fn(),
+  debug: jest.fn(),
+  trace: jest.fn(),
+  child: jest.fn().mockReturnThis()
+}));
+
 // Mock sqlite3 globally to avoid native module loading issues in tests
 jest.mock('sqlite3', () => {
   const mockDatabase = {

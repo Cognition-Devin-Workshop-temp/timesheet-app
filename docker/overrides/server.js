@@ -2,8 +2,12 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const helmet = require('helmet');
-const morgan = require('morgan');
+const pinoHttp = require('pino-http');
 const rateLimit = require('express-rate-limit');
+
+const logger = require('./lib/logger');
+const { correlationId } = require('./middleware/correlationId');
+const { metricsMiddleware, register } = require('./middleware/metrics');
 
 const authRoutes = require('./routes/auth');
 const clientRoutes = require('./routes/clients');
@@ -16,8 +20,38 @@ const { errorHandler } = require('./middleware/errorHandler');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+let isReady = false;
+
+// Correlation ID (must be first to propagate through all middleware)
+app.use(correlationId);
+
+// Prometheus metrics collection
+app.use(metricsMiddleware);
+
+// Structured HTTP request logging via pino-http
+app.use(pinoHttp({
+  logger,
+  genReqId: (req) => req.id,
+  customProps: (req) => ({
+    requestId: req.id
+  }),
+  serializers: {
+    req(req) {
+      return {
+        method: req.method,
+        url: req.url,
+        requestId: req.id
+      };
+    },
+    res(res) {
+      return {
+        statusCode: res.statusCode
+      };
+    }
+  }
+}));
+
 // Security middleware with CSP configured for React SPA
-// Note: HSTS and upgrade-insecure-requests disabled since we serve HTTP without SSL
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -35,7 +69,7 @@ app.use(helmet({
   strictTransportSecurity: false,
 }));
 
-// CORS configuration - in production, same origin so allow all
+// CORS configuration
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' ? true : (process.env.FRONTEND_URL || 'http://localhost:5173'),
   credentials: true
@@ -43,21 +77,36 @@ app.use(cors({
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100
 });
 app.use(limiter);
-
-// Logging
-app.use(morgan('combined'));
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Health check
+// Prometheus metrics endpoint
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', register.contentType);
+  res.end(await register.metrics());
+});
+
+// Health check endpoints
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+app.get('/health/live', (req, res) => {
+  res.status(200).json({ status: 'alive', timestamp: new Date().toISOString() });
+});
+
+app.get('/health/ready', (req, res) => {
+  if (isReady) {
+    res.status(200).json({ status: 'ready', timestamp: new Date().toISOString() });
+  } else {
+    res.status(503).json({ status: 'not ready', timestamp: new Date().toISOString() });
+  }
 });
 
 // API Routes
@@ -89,13 +138,12 @@ if (process.env.NODE_ENV === 'production') {
 async function startServer() {
   try {
     await initializeDatabase();
+    isReady = true;
     app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server running on port ${PORT}`);
-      console.log(`Health check: http://localhost:${PORT}/health`);
-      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      logger.info({ port: PORT, env: process.env.NODE_ENV || 'development' }, 'Server started');
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    logger.fatal({ err: error }, 'Failed to start server');
     process.exit(1);
   }
 }

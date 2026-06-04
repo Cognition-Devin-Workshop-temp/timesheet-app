@@ -1,22 +1,30 @@
 const { errorHandler } = require('../../middleware/errorHandler');
 
+jest.mock('../../lib/logger', () => ({
+  warn: jest.fn(),
+  error: jest.fn(),
+  info: jest.fn(),
+  fatal: jest.fn()
+}));
+
+const logger = require('../../lib/logger');
+
 describe('Error Handler Middleware', () => {
   let req, res, next;
 
   beforeEach(() => {
-    req = {};
+    req = {
+      id: 'test-request-id',
+      method: 'GET',
+      originalUrl: '/test',
+      headers: {}
+    };
     res = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn()
     };
     next = jest.fn();
-    
-    // Mock console.error to avoid cluttering test output
-    jest.spyOn(console, 'error').mockImplementation(() => {});
-  });
-
-  afterEach(() => {
-    jest.restoreAllMocks();
+    jest.clearAllMocks();
   });
 
   describe('Joi Validation Errors', () => {
@@ -126,13 +134,59 @@ describe('Error Handler Middleware', () => {
     });
   });
 
-  describe('Console Logging', () => {
-    test('should log error to console', () => {
+  describe('Structured Logging', () => {
+    test('should log error with structured context', () => {
       const error = new Error('Test error');
       
       errorHandler(error, req, res, next);
 
-      expect(console.error).toHaveBeenCalledWith('Error:', error);
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestId: 'test-request-id',
+          method: 'GET',
+          url: '/test',
+          error: expect.objectContaining({
+            message: 'Test error',
+            name: 'Error'
+          })
+        }),
+        'Unhandled error'
+      );
+    });
+
+    test('should log validation errors as warnings', () => {
+      const joiError = {
+        isJoi: true,
+        details: [{ message: 'Field is required' }]
+      };
+
+      errorHandler(joiError, req, res, next);
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestId: 'test-request-id'
+        }),
+        'Validation error'
+      );
+    });
+
+    test('should log database errors with error code', () => {
+      const sqliteError = {
+        code: 'SQLITE_CONSTRAINT',
+        message: 'UNIQUE constraint failed'
+      };
+
+      errorHandler(sqliteError, req, res, next);
+
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestId: 'test-request-id',
+          error: expect.objectContaining({
+            code: 'SQLITE_CONSTRAINT'
+          })
+        }),
+        'Database error'
+      );
     });
   });
 });
