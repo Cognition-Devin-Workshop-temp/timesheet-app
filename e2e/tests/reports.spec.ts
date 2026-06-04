@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, createClient, uniqueName } from './helpers';
+import { login, createClient, selectClient, uniqueName } from './helpers';
 
 test.describe('Reports', () => {
   let clientName: string;
@@ -15,8 +15,7 @@ test.describe('Reports', () => {
     await page.goto('/work-entries');
     for (const hours of ['3', '5']) {
       await page.getByRole('button', { name: 'Add Work Entry' }).click();
-      await page.getByLabel('Client').click();
-      await page.getByRole('option', { name: clientName }).click();
+      await selectClient(page, clientName);
       await page.getByLabel('Hours').fill(hours);
       await page.getByLabel('Description').fill(`Entry for ${hours}h`);
       await page.getByRole('button', { name: 'Create' }).click();
@@ -27,8 +26,8 @@ test.describe('Reports', () => {
   test('should show correct report for a client', async ({ page }) => {
     await page.goto('/reports');
 
-    // Select the client
-    await page.getByLabel('Select Client').click();
+    // Select the client from the MUI Select
+    await page.getByRole('combobox').click();
     await page.getByRole('option', { name: clientName }).click();
 
     // Wait for report data to load

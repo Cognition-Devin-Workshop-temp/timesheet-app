@@ -19,9 +19,15 @@ export async function createClient(
   if (opts.email) await page.getByLabel('Email').fill(opts.email);
   if (opts.description) await page.getByLabel('Description').fill(opts.description);
   await page.getByRole('button', { name: 'Create' }).click();
-  // Wait for dialog to close and client to appear
   await expect(page.getByRole('dialog')).toBeHidden();
   await expect(page.getByText(name)).toBeVisible();
+}
+
+/** Select a client in the MUI Select inside the work entry dialog */
+export async function selectClient(page: Page, clientName: string) {
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('combobox').click();
+  await page.getByRole('option', { name: clientName }).click();
 }
 
 export async function deleteAllClients(page: Page) {

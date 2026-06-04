@@ -22,8 +22,9 @@ test.describe('Client CRUD', () => {
     await page.getByRole('button', { name: 'Create' }).click();
 
     await expect(page.getByRole('dialog')).toBeHidden();
-    await expect(page.getByText(clientName)).toBeVisible();
-    await expect(page.getByText('Engineering')).toBeVisible();
+    const row = page.getByRole('row').filter({ hasText: clientName });
+    await expect(row).toBeVisible();
+    await expect(row.getByText('Engineering')).toBeVisible();
   });
 
   test('should edit an existing client', async ({ page }) => {
