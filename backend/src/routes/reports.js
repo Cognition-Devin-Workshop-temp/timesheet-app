@@ -11,6 +11,95 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticateUser);
 
+// Dashboard aggregation endpoint
+router.get('/dashboard', (req, res) => {
+  const granularity = req.query.granularity === 'monthly' ? 'monthly' : 'weekly';
+  const periods = parseInt(req.query.periods) || 12;
+
+  const db = getDatabase();
+
+  const strftimeFmt = granularity === 'weekly' ? '%Y-%W' : '%Y-%m';
+  const daysBack = granularity === 'weekly' ? periods * 7 : periods * 30;
+
+  const sql = `
+    SELECT c.name as client_name,
+           strftime('${strftimeFmt}', we.date / 1000, 'unixepoch') as period,
+           SUM(we.hours) as total_hours
+    FROM work_entries we
+    JOIN clients c ON we.client_id = c.id
+    WHERE we.user_email = ?
+      AND we.date >= CAST(strftime('%s', date('now', '-' || ? || ' days')) AS INTEGER) * 1000
+    GROUP BY c.name, period
+    ORDER BY period ASC
+  `;
+
+  db.all(sql, [req.userEmail, daysBack], (err, rows) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
+    // Build series grouped by period
+    const periodMap = {};
+    const clientSet = new Set();
+    const clientTotals = {};
+
+    rows.forEach((row) => {
+      clientSet.add(row.client_name);
+      if (!periodMap[row.period]) {
+        periodMap[row.period] = { clients: {}, total: 0 };
+      }
+      periodMap[row.period].clients[row.client_name] = row.total_hours;
+      periodMap[row.period].total += row.total_hours;
+
+      clientTotals[row.client_name] = (clientTotals[row.client_name] || 0) + row.total_hours;
+    });
+
+    const series = Object.keys(periodMap)
+      .sort()
+      .map((period) => {
+        let periodLabel = period;
+        if (granularity === 'weekly') {
+          // Convert YYYY-WW to a readable date range
+          const [year, week] = period.split('-');
+          const jan1 = new Date(parseInt(year), 0, 1);
+          const jan1Day = jan1.getDay();
+          const firstMondayOffset = jan1Day === 0 ? 1 : (jan1Day === 1 ? 0 : 8 - jan1Day);
+          const weekNum = parseInt(week);
+          let weekStart;
+          if (weekNum === 0) {
+            weekStart = new Date(parseInt(year), 0, 1);
+          } else {
+            weekStart = new Date(parseInt(year), 0, 1 + firstMondayOffset + (weekNum - 1) * 7);
+          }
+          const weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekEnd.getDate() + 6);
+          const opts = { month: 'short', day: 'numeric' };
+          periodLabel = `${weekStart.toLocaleDateString('en-US', opts)} - ${weekEnd.toLocaleDateString('en-US', opts)}`;
+        } else {
+          // Convert YYYY-MM to readable month
+          const [year, month] = period.split('-');
+          const d = new Date(parseInt(year), parseInt(month) - 1, 1);
+          periodLabel = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        }
+
+        return {
+          period,
+          periodLabel,
+          clients: periodMap[period].clients,
+          total: periodMap[period].total,
+        };
+      });
+
+    res.json({
+      granularity,
+      series,
+      clients: Array.from(clientSet).sort(),
+      totals: clientTotals,
+    });
+  });
+});
+
 // Get hourly report for specific client
 router.get('/client/:clientId', (req, res) => {
   const clientId = parseInt(req.params.clientId);

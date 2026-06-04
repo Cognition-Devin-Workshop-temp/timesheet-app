@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Grid,
   Card,
@@ -7,6 +7,9 @@ import {
   Box,
   Button,
   Paper,
+  ToggleButtonGroup,
+  ToggleButton,
+  CircularProgress,
 } from '@mui/material';
 import {
   Business as BusinessIcon,
@@ -16,10 +19,38 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts';
 import apiClient from '../api/client';
+
+const CHART_COLORS = ['#1976d2', '#388e3c', '#f57c00', '#d32f2f', '#7b1fa2', '#0097a7', '#689f38', '#fbc02d', '#5d4037', '#455a64'];
+
+type PeriodOption = { label: string; granularity: 'weekly' | 'monthly'; periods: number };
+
+const PERIOD_OPTIONS: PeriodOption[] = [
+  { label: 'Last 4 Weeks', granularity: 'weekly', periods: 4 },
+  { label: 'Last 12 Weeks', granularity: 'weekly', periods: 12 },
+  { label: 'Last 6 Months', granularity: 'monthly', periods: 6 },
+  { label: 'Last 12 Months', granularity: 'monthly', periods: 12 },
+];
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
+  const [selectedPeriod, setSelectedPeriod] = useState(1); // default: Last 12 Weeks
+
+  const granularity = PERIOD_OPTIONS[selectedPeriod].granularity;
+  const periods = PERIOD_OPTIONS[selectedPeriod].periods;
 
   const { data: clientsData } = useQuery({
     queryKey: ['clients'],
@@ -29,6 +60,11 @@ const DashboardPage: React.FC = () => {
   const { data: workEntriesData } = useQuery({
     queryKey: ['workEntries'],
     queryFn: () => apiClient.getWorkEntries(),
+  });
+
+  const { data: dashboardData, isLoading: chartsLoading } = useQuery({
+    queryKey: ['dashboardStats', granularity, periods],
+    queryFn: () => apiClient.getDashboardStats(granularity, periods),
   });
 
   const clients = clientsData?.clients || [];
@@ -60,6 +96,27 @@ const DashboardPage: React.FC = () => {
       action: () => navigate('/reports'),
     },
   ];
+
+  // Prepare bar chart data: each item is { periodLabel, [clientName]: hours, ... }
+  const barChartData = (dashboardData?.series || []).map(
+    (item: { periodLabel: string; clients: Record<string, number>; total: number }) => ({
+      periodLabel: item.periodLabel,
+      ...item.clients,
+    })
+  );
+
+  // Prepare pie chart data
+  const pieChartData = Object.entries(dashboardData?.totals || {}).map(
+    ([name, value]) => ({ name, value: value as number })
+  );
+
+  const clientNames: string[] = dashboardData?.clients || [];
+
+  const handlePeriodChange = (_: React.MouseEvent<HTMLElement>, newValue: number | null) => {
+    if (newValue !== null) {
+      setSelectedPeriod(newValue);
+    }
+  };
 
   return (
     <Box>
@@ -108,6 +165,88 @@ const DashboardPage: React.FC = () => {
           </Grid>
         ))}
       </Grid>
+
+      {/* Period selector */}
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
+        <ToggleButtonGroup
+          value={selectedPeriod}
+          exclusive
+          onChange={handlePeriodChange}
+          size="small"
+        >
+          {PERIOD_OPTIONS.map((option, idx) => (
+            <ToggleButton key={idx} value={idx}>
+              {option.label}
+            </ToggleButton>
+          ))}
+        </ToggleButtonGroup>
+      </Box>
+
+      {/* Charts section */}
+      {chartsLoading ? (
+        <Box display="flex" justifyContent="center" alignItems="center" sx={{ py: 8 }}>
+          <CircularProgress />
+        </Box>
+      ) : barChartData.length === 0 ? (
+        <Paper sx={{ p: 4, mb: 4, textAlign: 'center' }}>
+          <Typography color="text.secondary">No data to display</Typography>
+        </Paper>
+      ) : (
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          {/* @ts-expect-error - MUI Grid item prop type issue */}
+          <Grid item xs={12} md={8}>
+            <Paper sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Hours by Client
+              </Typography>
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart data={barChartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="periodLabel" tick={{ fontSize: 12 }} />
+                  <YAxis label={{ value: 'Hours', angle: -90, position: 'insideLeft' }} />
+                  <Tooltip />
+                  <Legend />
+                  {clientNames.map((clientName, idx) => (
+                    <Bar
+                      key={clientName}
+                      dataKey={clientName}
+                      stackId="hours"
+                      fill={CHART_COLORS[idx % CHART_COLORS.length]}
+                    />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </Paper>
+          </Grid>
+
+          {/* @ts-expect-error - MUI Grid item prop type issue */}
+          <Grid item xs={12} md={4}>
+            <Paper sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Total Hours Distribution
+              </Typography>
+              <ResponsiveContainer width="100%" height={400}>
+                <PieChart>
+                  <Pie
+                    data={pieChartData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={120}
+                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                  >
+                    {pieChartData.map((_, idx) => (
+                      <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </Paper>
+          </Grid>
+        </Grid>
+      )}
 
       <Grid container spacing={3}>
         {/* @ts-expect-error - MUI Grid item prop type issue */}
