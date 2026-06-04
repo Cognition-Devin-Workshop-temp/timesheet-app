@@ -113,6 +113,14 @@ class ApiClient {
     return response.data;
   }
 
+  // Dashboard stats
+  async getDashboardStats(granularity: 'weekly' | 'monthly' = 'weekly', periods: number = 12) {
+    const response = await this.client.get('/api/reports/dashboard', {
+      params: { granularity, periods }
+    });
+    return response.data;
+  }
+
   // Report endpoints
   async getClientReport(clientId: number) {
     const response = await this.client.get(`/api/reports/client/${clientId}`);
