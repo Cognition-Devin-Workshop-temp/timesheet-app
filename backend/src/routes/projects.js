@@ -27,8 +27,12 @@ router.get('/', (req, res) => {
   }
 
   if (clientId) {
+    const clientIdNum = parseInt(clientId);
+    if (isNaN(clientIdNum)) {
+      return res.status(400).json({ error: 'Invalid client ID' });
+    }
     query += ' AND p.client_id = ?';
-    params.push(parseInt(clientId));
+    params.push(clientIdNum);
   }
 
   query += ' ORDER BY p.updated_at DESC';
@@ -82,36 +86,57 @@ router.post('/', (req, res, next) => {
     const { name, description, status, clientId, startDate, endDate } = value;
     const db = getDatabase();
 
-    db.run(
-      `INSERT INTO projects (name, description, status, client_id, start_date, end_date, user_email)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [name, description || null, status || 'active', clientId || null, startDate || null, endDate || null, req.userEmail],
-      function(err) {
-        if (err) {
-          console.error('Database error:', err);
-          return res.status(500).json({ error: 'Failed to create project' });
-        }
-
-        db.get(
-          `SELECT p.id, p.name, p.description, p.status, p.client_id, p.start_date, p.end_date,
-                  p.created_at, p.updated_at, c.name AS client_name
-           FROM projects p
-           LEFT JOIN clients c ON p.client_id = c.id
-           WHERE p.id = ?`,
-          [this.lastID],
-          (err, row) => {
-            if (err) {
-              console.error('Database error:', err);
-              return res.status(500).json({ error: 'Project created but failed to retrieve' });
-            }
-            res.status(201).json({
-              message: 'Project created successfully',
-              project: row
-            });
+    const doInsert = () => {
+      db.run(
+        `INSERT INTO projects (name, description, status, client_id, start_date, end_date, user_email)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [name, description || null, status || 'active', clientId || null, startDate || null, endDate || null, req.userEmail],
+        function(err) {
+          if (err) {
+            console.error('Database error:', err);
+            return res.status(500).json({ error: 'Failed to create project' });
           }
-        );
-      }
-    );
+
+          db.get(
+            `SELECT p.id, p.name, p.description, p.status, p.client_id, p.start_date, p.end_date,
+                    p.created_at, p.updated_at, c.name AS client_name
+             FROM projects p
+             LEFT JOIN clients c ON p.client_id = c.id
+             WHERE p.id = ?`,
+            [this.lastID],
+            (err, row) => {
+              if (err) {
+                console.error('Database error:', err);
+                return res.status(500).json({ error: 'Project created but failed to retrieve' });
+              }
+              res.status(201).json({
+                message: 'Project created successfully',
+                project: row
+              });
+            }
+          );
+        }
+      );
+    };
+
+    if (clientId) {
+      db.get(
+        'SELECT id FROM clients WHERE id = ? AND user_email = ?',
+        [clientId, req.userEmail],
+        (err, row) => {
+          if (err) {
+            console.error('Database error:', err);
+            return res.status(500).json({ error: 'Internal server error' });
+          }
+          if (!row) {
+            return res.status(400).json({ error: 'Client not found or does not belong to user' });
+          }
+          doInsert();
+        }
+      );
+    } else {
+      doInsert();
+    }
   } catch (error) {
     next(error);
   }
@@ -144,64 +169,85 @@ router.put('/:id', (req, res, next) => {
           return res.status(404).json({ error: 'Project not found' });
         }
 
-        const updates = [];
-        const values = [];
+        const doUpdate = () => {
+          const updates = [];
+          const values = [];
 
-        if (value.name !== undefined) {
-          updates.push('name = ?');
-          values.push(value.name);
-        }
-        if (value.description !== undefined) {
-          updates.push('description = ?');
-          values.push(value.description || null);
-        }
-        if (value.status !== undefined) {
-          updates.push('status = ?');
-          values.push(value.status);
-        }
-        if (value.clientId !== undefined) {
-          updates.push('client_id = ?');
-          values.push(value.clientId);
-        }
-        if (value.startDate !== undefined) {
-          updates.push('start_date = ?');
-          values.push(value.startDate || null);
-        }
-        if (value.endDate !== undefined) {
-          updates.push('end_date = ?');
-          values.push(value.endDate || null);
-        }
-
-        updates.push('updated_at = CURRENT_TIMESTAMP');
-        values.push(projectId, req.userEmail);
-
-        const query = `UPDATE projects SET ${updates.join(', ')} WHERE id = ? AND user_email = ?`;
-
-        db.run(query, values, function(err) {
-          if (err) {
-            console.error('Database error:', err);
-            return res.status(500).json({ error: 'Failed to update project' });
+          if (value.name !== undefined) {
+            updates.push('name = ?');
+            values.push(value.name);
+          }
+          if (value.description !== undefined) {
+            updates.push('description = ?');
+            values.push(value.description || null);
+          }
+          if (value.status !== undefined) {
+            updates.push('status = ?');
+            values.push(value.status);
+          }
+          if (value.clientId !== undefined) {
+            updates.push('client_id = ?');
+            values.push(value.clientId);
+          }
+          if (value.startDate !== undefined) {
+            updates.push('start_date = ?');
+            values.push(value.startDate || null);
+          }
+          if (value.endDate !== undefined) {
+            updates.push('end_date = ?');
+            values.push(value.endDate || null);
           }
 
+          updates.push('updated_at = CURRENT_TIMESTAMP');
+          values.push(projectId, req.userEmail);
+
+          const query = `UPDATE projects SET ${updates.join(', ')} WHERE id = ? AND user_email = ?`;
+
+          db.run(query, values, function(err) {
+            if (err) {
+              console.error('Database error:', err);
+              return res.status(500).json({ error: 'Failed to update project' });
+            }
+
+            db.get(
+              `SELECT p.id, p.name, p.description, p.status, p.client_id, p.start_date, p.end_date,
+                      p.created_at, p.updated_at, c.name AS client_name
+               FROM projects p
+               LEFT JOIN clients c ON p.client_id = c.id
+               WHERE p.id = ?`,
+              [projectId],
+              (err, row) => {
+                if (err) {
+                  console.error('Database error:', err);
+                  return res.status(500).json({ error: 'Project updated but failed to retrieve' });
+                }
+                res.json({
+                  message: 'Project updated successfully',
+                  project: row
+                });
+              }
+            );
+          });
+        };
+
+        if (value.clientId !== undefined && value.clientId !== null) {
           db.get(
-            `SELECT p.id, p.name, p.description, p.status, p.client_id, p.start_date, p.end_date,
-                    p.created_at, p.updated_at, c.name AS client_name
-             FROM projects p
-             LEFT JOIN clients c ON p.client_id = c.id
-             WHERE p.id = ?`,
-            [projectId],
-            (err, row) => {
+            'SELECT id FROM clients WHERE id = ? AND user_email = ?',
+            [value.clientId, req.userEmail],
+            (err, clientRow) => {
               if (err) {
                 console.error('Database error:', err);
-                return res.status(500).json({ error: 'Project updated but failed to retrieve' });
+                return res.status(500).json({ error: 'Internal server error' });
               }
-              res.json({
-                message: 'Project updated successfully',
-                project: row
-              });
+              if (!clientRow) {
+                return res.status(400).json({ error: 'Client not found or does not belong to user' });
+              }
+              doUpdate();
             }
           );
-        });
+        } else {
+          doUpdate();
+        }
       }
     );
   } catch (error) {
