@@ -44,6 +44,55 @@ router.get('/', (req, res) => {
   });
 });
 
+// Get effort summary for a specific client
+router.get('/effort-summary/:clientId', (req, res) => {
+  const clientId = parseInt(req.params.clientId);
+
+  if (isNaN(clientId)) {
+    return res.status(400).json({ error: 'Invalid client ID' });
+  }
+
+  const db = getDatabase();
+
+  db.get(
+    'SELECT id, name, available_efforts FROM clients WHERE id = ? AND user_email = ?',
+    [clientId, req.userEmail],
+    (err, client) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      if (!client) {
+        return res.status(404).json({ error: 'Client not found' });
+      }
+
+      db.get(
+        'SELECT COALESCE(SUM(hours), 0) as total_hours FROM work_entries WHERE client_id = ? AND user_email = ?',
+        [clientId, req.userEmail],
+        (err, result) => {
+          if (err) {
+            console.error('Database error:', err);
+            return res.status(500).json({ error: 'Internal server error' });
+          }
+
+          const usedHours = parseFloat(result.total_hours);
+          const availableEfforts = client.available_efforts;
+          const remainingHours = availableEfforts != null ? availableEfforts - usedHours : null;
+
+          res.json({
+            clientId: client.id,
+            clientName: client.name,
+            availableEfforts,
+            usedHours,
+            remainingHours
+          });
+        }
+      );
+    }
+  );
+});
+
 // Get specific work entry
 router.get('/:id', (req, res) => {
   const workEntryId = parseInt(req.params.id);
@@ -89,7 +138,7 @@ router.post('/', (req, res, next) => {
 
     // Verify client exists and belongs to user
     db.get(
-      'SELECT id FROM clients WHERE id = ? AND user_email = ?',
+      'SELECT id, available_efforts FROM clients WHERE id = ? AND user_email = ?',
       [clientId, req.userEmail],
       (err, row) => {
         if (err) {
@@ -101,38 +150,69 @@ router.post('/', (req, res, next) => {
           return res.status(400).json({ error: 'Client not found or does not belong to user' });
         }
 
-        // Create work entry
-        db.run(
-          'INSERT INTO work_entries (client_id, user_email, hours, description, date) VALUES (?, ?, ?, ?, ?)',
-          [clientId, req.userEmail, hours, description || null, date],
-          function(err) {
-            if (err) {
-              console.error('Database error:', err);
-              return res.status(500).json({ error: 'Failed to create work entry' });
-            }
+        const availableEfforts = row.available_efforts;
 
-            // Return the created work entry with client name
-            db.get(
-              `SELECT we.id, we.client_id, we.hours, we.description, we.date, 
-                      we.created_at, we.updated_at, c.name as client_name
-               FROM work_entries we
-               JOIN clients c ON we.client_id = c.id
-               WHERE we.id = ?`,
-              [this.lastID],
-              (err, row) => {
-                if (err) {
-                  console.error('Database error:', err);
-                  return res.status(500).json({ error: 'Work entry created but failed to retrieve' });
-                }
+        // If available_efforts is set, validate total hours
+        if (availableEfforts != null) {
+          db.get(
+            'SELECT COALESCE(SUM(hours), 0) as total_hours FROM work_entries WHERE client_id = ? AND user_email = ?',
+            [clientId, req.userEmail],
+            (err, result) => {
+              if (err) {
+                console.error('Database error:', err);
+                return res.status(500).json({ error: 'Internal server error' });
+              }
 
-                res.status(201).json({
-                  message: 'Work entry created successfully',
-                  workEntry: row
+              const currentTotal = parseFloat(result.total_hours);
+              const remaining = availableEfforts - currentTotal;
+
+              if (hours > remaining) {
+                return res.status(400).json({
+                  error: `Hours exceed available efforts. Available: ${availableEfforts} hrs, Used: ${currentTotal} hrs, Remaining: ${remaining.toFixed(2)} hrs, Requested: ${hours} hrs`
                 });
               }
-            );
-          }
-        );
+
+              insertWorkEntry();
+            }
+          );
+        } else {
+          insertWorkEntry();
+        }
+
+        function insertWorkEntry() {
+          // Create work entry
+          db.run(
+            'INSERT INTO work_entries (client_id, user_email, hours, description, date) VALUES (?, ?, ?, ?, ?)',
+            [clientId, req.userEmail, hours, description || null, date],
+            function(err) {
+              if (err) {
+                console.error('Database error:', err);
+                return res.status(500).json({ error: 'Failed to create work entry' });
+              }
+
+              // Return the created work entry with client name
+              db.get(
+                `SELECT we.id, we.client_id, we.hours, we.description, we.date, 
+                        we.created_at, we.updated_at, c.name as client_name
+                 FROM work_entries we
+                 JOIN clients c ON we.client_id = c.id
+                 WHERE we.id = ?`,
+                [this.lastID],
+                (err, row) => {
+                  if (err) {
+                    console.error('Database error:', err);
+                    return res.status(500).json({ error: 'Work entry created but failed to retrieve' });
+                  }
+
+                  res.status(201).json({
+                    message: 'Work entry created successfully',
+                    workEntry: row
+                  });
+                }
+              );
+            }
+          );
+        }
       }
     );
   } catch (error) {
@@ -158,7 +238,7 @@ router.put('/:id', (req, res, next) => {
 
     // Check if work entry exists and belongs to user
     db.get(
-      'SELECT id FROM work_entries WHERE id = ? AND user_email = ?',
+      'SELECT we.id, we.hours, we.client_id FROM work_entries we WHERE we.id = ? AND we.user_email = ?',
       [workEntryId, req.userEmail],
       (err, row) => {
         if (err) {
@@ -170,10 +250,12 @@ router.put('/:id', (req, res, next) => {
           return res.status(404).json({ error: 'Work entry not found' });
         }
 
+        const existingEntry = row;
+
         // If clientId is being updated, verify it belongs to user
         if (value.clientId) {
           db.get(
-            'SELECT id FROM clients WHERE id = ? AND user_email = ?',
+            'SELECT id, available_efforts FROM clients WHERE id = ? AND user_email = ?',
             [value.clientId, req.userEmail],
             (err, clientRow) => {
               if (err) {
@@ -185,11 +267,59 @@ router.put('/:id', (req, res, next) => {
                 return res.status(400).json({ error: 'Client not found or does not belong to user' });
               }
 
-              performUpdate();
+              validateEffortsAndUpdate(clientRow);
             }
           );
         } else {
-          performUpdate();
+          // Hours may be changing on the same client — need to validate
+          if (value.hours !== undefined) {
+            db.get(
+              'SELECT id, available_efforts FROM clients WHERE id = ? AND user_email = ?',
+              [existingEntry.client_id, req.userEmail],
+              (err, clientRow) => {
+                if (err) {
+                  console.error('Database error:', err);
+                  return res.status(500).json({ error: 'Internal server error' });
+                }
+
+                validateEffortsAndUpdate(clientRow || {});
+              }
+            );
+          } else {
+            performUpdate();
+          }
+        }
+
+        function validateEffortsAndUpdate(clientRow) {
+          const availableEfforts = clientRow.available_efforts;
+          const targetClientId = value.clientId || existingEntry.client_id;
+          const newHours = value.hours !== undefined ? value.hours : existingEntry.hours;
+
+          if (availableEfforts != null) {
+            db.get(
+              'SELECT COALESCE(SUM(hours), 0) as total_hours FROM work_entries WHERE client_id = ? AND user_email = ? AND id != ?',
+              [targetClientId, req.userEmail, workEntryId],
+              (err, result) => {
+                if (err) {
+                  console.error('Database error:', err);
+                  return res.status(500).json({ error: 'Internal server error' });
+                }
+
+                const otherTotal = parseFloat(result.total_hours);
+                const remaining = availableEfforts - otherTotal;
+
+                if (newHours > remaining) {
+                  return res.status(400).json({
+                    error: `Hours exceed available efforts. Available: ${availableEfforts} hrs, Used by other entries: ${otherTotal} hrs, Remaining: ${remaining.toFixed(2)} hrs, Requested: ${newHours} hrs`
+                  });
+                }
+
+                performUpdate();
+              }
+            );
+          } else {
+            performUpdate();
+          }
         }
 
         function performUpdate() {

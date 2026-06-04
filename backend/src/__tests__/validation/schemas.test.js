@@ -83,6 +83,45 @@ describe('Validation Schemas', () => {
       const { value } = clientSchema.validate(client);
       expect(value.name).toBe('Test Client');
     });
+
+    test('should accept valid availableEfforts', () => {
+      const client = {
+        name: 'Test Client',
+        availableEfforts: 100.5
+      };
+
+      const { error } = clientSchema.validate(client);
+      expect(error).toBeUndefined();
+    });
+
+    test('should allow null availableEfforts', () => {
+      const client = {
+        name: 'Test Client',
+        availableEfforts: null
+      };
+
+      const { error } = clientSchema.validate(client);
+      expect(error).toBeUndefined();
+    });
+
+    test('should allow missing availableEfforts', () => {
+      const client = {
+        name: 'Test Client'
+      };
+
+      const { error } = clientSchema.validate(client);
+      expect(error).toBeUndefined();
+    });
+
+    test('should reject negative availableEfforts', () => {
+      const client = {
+        name: 'Test Client',
+        availableEfforts: -10
+      };
+
+      const { error } = clientSchema.validate(client);
+      expect(error).toBeDefined();
+    });
   });
 
   describe('workEntrySchema', () => {

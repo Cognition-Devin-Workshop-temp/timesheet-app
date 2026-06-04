@@ -43,6 +43,7 @@ async function initializeDatabase() {
           description TEXT,
           department TEXT,
           email TEXT,
+          available_efforts DECIMAL(10,2) DEFAULT NULL,
           user_email TEXT NOT NULL,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,

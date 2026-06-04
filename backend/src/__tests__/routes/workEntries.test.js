@@ -133,7 +133,7 @@ describe('Work Entry Routes', () => {
 
       mockDb.get.mockImplementation((query, params, callback) => {
         if (query.includes('clients')) {
-          callback(null, { id: 1 }); // Client exists
+          callback(null, { id: 1, available_efforts: null }); // Client exists, no effort limit
         } else {
           callback(null, { id: 1, ...newEntry, client_name: 'Client A' });
         }
@@ -150,6 +150,48 @@ describe('Work Entry Routes', () => {
 
       expect(response.status).toBe(201);
       expect(response.body.message).toBe('Work entry created successfully');
+    });
+
+    test('should create work entry when within available efforts', async () => {
+      let getCallCount = 0;
+      mockDb.get.mockImplementation((query, params, callback) => {
+        getCallCount++;
+        if (query.includes('clients')) {
+          callback(null, { id: 1, available_efforts: 100 });
+        } else if (query.includes('SUM(hours)')) {
+          callback(null, { total_hours: 50 }); // 50 hours used, 50 remaining
+        } else {
+          callback(null, { id: 1, client_id: 1, hours: 5, client_name: 'Client A' });
+        }
+      });
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 1;
+        callback.call(this, null);
+      });
+
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 5, date: '2024-01-15' });
+
+      expect(response.status).toBe(201);
+    });
+
+    test('should return 400 when hours exceed available efforts', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        if (query.includes('clients')) {
+          callback(null, { id: 1, available_efforts: 100 });
+        } else if (query.includes('SUM(hours)')) {
+          callback(null, { total_hours: 98 }); // 98 used, only 2 remaining
+        }
+      });
+
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 5, date: '2024-01-15' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('Hours exceed available efforts');
     });
 
     test('should return 400 if client not found', async () => {
@@ -203,7 +245,7 @@ describe('Work Entry Routes', () => {
 
     test('should handle database error on insert', async () => {
       mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, { id: 1 });
+        callback(null, { id: 1, available_efforts: null });
       });
 
       mockDb.run.mockImplementation((query, params, callback) => {
@@ -225,11 +267,20 @@ describe('Work Entry Routes', () => {
 
   describe('PUT /api/work-entries/:id', () => {
     test('should update work entry hours', async () => {
+      let getCallCount = 0;
       mockDb.get.mockImplementation((query, params, callback) => {
-        if (query.includes('work_entries we')) {
+        getCallCount++;
+        if (getCallCount === 1) {
+          // work entry exists
+          callback(null, { id: 1, hours: 5, client_id: 1 });
+        } else if (query.includes('clients')) {
+          // client lookup for effort validation
+          callback(null, { id: 1, available_efforts: null });
+        } else if (query.includes('work_entries we')) {
+          // return updated entry
           callback(null, { id: 1, hours: 8, client_name: 'Client A' });
         } else {
-          callback(null, { id: 1 });
+          callback(null, { id: 1, hours: 8, client_name: 'Client A' });
         }
       });
 
@@ -246,8 +297,16 @@ describe('Work Entry Routes', () => {
     });
 
     test('should update work entry client', async () => {
+      let getCallCount = 0;
       mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, { id: 1 });
+        getCallCount++;
+        if (getCallCount === 1) {
+          callback(null, { id: 1, hours: 5, client_id: 1 }); // existing work entry
+        } else if (query.includes('clients')) {
+          callback(null, { id: 2, available_efforts: null }); // target client
+        } else {
+          callback(null, { id: 1, hours: 5, client_id: 2, client_name: 'Client B' });
+        }
       });
 
       mockDb.run.mockImplementation((query, params, callback) => {
@@ -259,6 +318,27 @@ describe('Work Entry Routes', () => {
         .send({ clientId: 2 });
 
       expect(response.status).toBe(200);
+    });
+
+    test('should return 400 when updated hours exceed available efforts', async () => {
+      let getCallCount = 0;
+      mockDb.get.mockImplementation((query, params, callback) => {
+        getCallCount++;
+        if (getCallCount === 1) {
+          callback(null, { id: 1, hours: 5, client_id: 1 });
+        } else if (query.includes('clients')) {
+          callback(null, { id: 1, available_efforts: 20 });
+        } else if (query.includes('SUM(hours)')) {
+          callback(null, { total_hours: 18 }); // 18 used by other entries, only 2 remaining
+        }
+      });
+
+      const response = await request(app)
+        .put('/api/work-entries/1')
+        .send({ hours: 5 });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('Hours exceed available efforts');
     });
 
     test('should return 404 if work entry not found', async () => {
@@ -292,9 +372,11 @@ describe('Work Entry Routes', () => {
     });
 
     test('should return 400 if new client not found', async () => {
+      let getCallCount = 0;
       mockDb.get.mockImplementation((query, params, callback) => {
-        if (query.includes('work_entries')) {
-          callback(null, { id: 1 });
+        getCallCount++;
+        if (getCallCount === 1) {
+          callback(null, { id: 1, hours: 5, client_id: 1 }); // existing work entry
         } else {
           callback(null, null); // Client doesn't exist
         }
@@ -406,7 +488,7 @@ describe('Work Entry Routes', () => {
       mockDb.get.mockImplementation((query, params, callback) => {
         getCallCount++;
         if (getCallCount === 1) {
-          callback(null, { id: 1 });
+          callback(null, { id: 1, available_efforts: null });
         } else {
           callback(new Error('Retrieval failed'), null);
         }
@@ -449,7 +531,7 @@ describe('Work Entry Routes', () => {
       mockDb.get.mockImplementation((query, params, callback) => {
         callCount++;
         if (callCount === 1) {
-          callback(null, { id: 1 });
+          callback(null, { id: 1, hours: 5, client_id: 1 });
         } else {
           callback(new Error('Database error'), null);
         }
@@ -465,7 +547,7 @@ describe('Work Entry Routes', () => {
 
     test('should handle database error during update', async () => {
       mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, { id: 1 });
+        callback(null, { id: 1, hours: 5, client_id: 1 });
       });
 
       mockDb.run.mockImplementation((query, params, callback) => {
@@ -474,7 +556,7 @@ describe('Work Entry Routes', () => {
 
       const response = await request(app)
         .put('/api/work-entries/1')
-        .send({ hours: 8 });
+        .send({ description: 'Test' });
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Failed to update work entry' });
@@ -485,7 +567,7 @@ describe('Work Entry Routes', () => {
       mockDb.get.mockImplementation((query, params, callback) => {
         getCallCount++;
         if (getCallCount === 1) {
-          callback(null, { id: 1 });
+          callback(null, { id: 1, hours: 5, client_id: 1 });
         } else {
           callback(new Error('Retrieval failed'), null);
         }
@@ -497,18 +579,22 @@ describe('Work Entry Routes', () => {
 
       const response = await request(app)
         .put('/api/work-entries/1')
-        .send({ hours: 8 });
+        .send({ description: 'Test' });
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Work entry updated but failed to retrieve' });
     });
 
     test('should update work entry date', async () => {
+      let getCallCount = 0;
       mockDb.get.mockImplementation((query, params, callback) => {
-        if (query.includes('work_entries we')) {
+        getCallCount++;
+        if (getCallCount === 1) {
+          callback(null, { id: 1, hours: 5, client_id: 1, date: '2024-01-01' });
+        } else if (query.includes('work_entries we')) {
           callback(null, { id: 1, date: '2024-02-01', client_name: 'Client A' });
         } else {
-          callback(null, { id: 1 });
+          callback(null, { id: 1, date: '2024-02-01', client_name: 'Client A' });
         }
       });
 
@@ -525,11 +611,15 @@ describe('Work Entry Routes', () => {
     });
 
     test('should update work entry description', async () => {
+      let getCallCount = 0;
       mockDb.get.mockImplementation((query, params, callback) => {
-        if (query.includes('work_entries we')) {
+        getCallCount++;
+        if (getCallCount === 1) {
+          callback(null, { id: 1, hours: 5, client_id: 1 });
+        } else if (query.includes('work_entries we')) {
           callback(null, { id: 1, description: 'New description', client_name: 'Client A' });
         } else {
-          callback(null, { id: 1 });
+          callback(null, { id: 1, description: 'New description', client_name: 'Client A' });
         }
       });
 
@@ -545,11 +635,15 @@ describe('Work Entry Routes', () => {
     });
 
     test('should update description to null when empty string provided', async () => {
+      let getCallCount = 0;
       mockDb.get.mockImplementation((query, params, callback) => {
-        if (query.includes('work_entries we')) {
+        getCallCount++;
+        if (getCallCount === 1) {
+          callback(null, { id: 1, hours: 5, client_id: 1 });
+        } else if (query.includes('work_entries we')) {
           callback(null, { id: 1, description: null, client_name: 'Client A' });
         } else {
-          callback(null, { id: 1 });
+          callback(null, { id: 1, description: null, client_name: 'Client A' });
         }
       });
 
@@ -565,11 +659,17 @@ describe('Work Entry Routes', () => {
     });
 
     test('should update multiple fields at once', async () => {
+      let getCallCount = 0;
       mockDb.get.mockImplementation((query, params, callback) => {
-        if (query.includes('work_entries we')) {
+        getCallCount++;
+        if (getCallCount === 1) {
+          callback(null, { id: 1, hours: 5, client_id: 1 });
+        } else if (query.includes('clients')) {
+          callback(null, { id: 1, available_efforts: null });
+        } else if (query.includes('work_entries we')) {
           callback(null, { id: 1, hours: 10, description: 'Updated', date: '2024-03-01', client_name: 'Client A' });
         } else {
-          callback(null, { id: 1 });
+          callback(null, { id: 1, hours: 10, description: 'Updated', date: '2024-03-01', client_name: 'Client A' });
         }
       });
 

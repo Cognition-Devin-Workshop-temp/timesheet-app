@@ -66,12 +66,12 @@ class ApiClient {
     return response.data;
   }
 
-  async createClient(clientData: { name: string; description?: string; department?: string; email?: string }) {
+  async createClient(clientData: { name: string; description?: string; department?: string; email?: string; availableEfforts?: number | null }) {
     const response = await this.client.post('/api/clients', clientData);
     return response.data;
   }
 
-  async updateClient(id: number, clientData: { name?: string; description?: string; department?: string; email?: string }) {
+  async updateClient(id: number, clientData: { name?: string; description?: string; department?: string; email?: string; availableEfforts?: number | null }) {
     const response = await this.client.put(`/api/clients/${id}`, clientData);
     return response.data;
   }
@@ -83,6 +83,12 @@ class ApiClient {
 
   async deleteAllClients() {
     const response = await this.client.delete('/api/clients');
+    return response.data;
+  }
+
+  // Effort summary
+  async getEffortSummary(clientId: number) {
+    const response = await this.client.get(`/api/work-entries/effort-summary/${clientId}`);
     return response.data;
   }
 
