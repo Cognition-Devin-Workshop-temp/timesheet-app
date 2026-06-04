@@ -63,6 +63,35 @@ export interface UpdateWorkEntryRequest {
   date?: string;
 }
 
+export interface Project {
+  id: number;
+  name: string;
+  description: string | null;
+  client_id: number | null;
+  client_name?: string;
+  start_date: string | null;
+  status: 'active' | 'completed' | 'on-hold';
+  user_email: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateProjectRequest {
+  name: string;
+  description?: string;
+  clientId?: number | null;
+  startDate?: string | null;
+  status?: 'active' | 'completed' | 'on-hold';
+}
+
+export interface UpdateProjectRequest {
+  name?: string;
+  description?: string;
+  clientId?: number | null;
+  startDate?: string | null;
+  status?: 'active' | 'completed' | 'on-hold';
+}
+
 export interface LoginRequest {
   email: string;
 }
