@@ -1,5 +1,6 @@
 export interface User {
   email: string;
+  role: string;
   createdAt: string;
 }
 
@@ -65,10 +66,23 @@ export interface UpdateWorkEntryRequest {
 
 export interface LoginRequest {
   email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  message: string;
+  token: string;
+  user: User;
 }
 
 export interface LoginResponse {
   message: string;
+  token: string;
   user: User;
 }
 

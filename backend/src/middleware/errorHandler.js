@@ -1,6 +1,13 @@
 function errorHandler(err, req, res, next) {
   console.error('Error:', err);
 
+  // CSRF errors
+  if (err.code === 'EBADCSRFTOKEN' || err.message === 'invalid csrf token' || err.message === 'misconfigured csrf') {
+    return res.status(403).json({
+      error: 'Invalid or missing CSRF token'
+    });
+  }
+
   // Joi validation errors
   if (err.isJoi) {
     return res.status(400).json({

@@ -20,3 +20,8 @@ jest.mock('sqlite3', () => {
     }))
   };
 });
+
+// Set test environment variables
+process.env.JWT_SECRET = 'test-jwt-secret-that-is-at-least-32-characters-long';
+process.env.DATABASE_PATH = ':memory:';
+process.env.NODE_ENV = 'test';

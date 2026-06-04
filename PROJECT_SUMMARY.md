@@ -1,35 +1,40 @@
 # Project Summary: Employee Time Tracking Application
 
-## 🎯 Project Completion Status: ✅ COMPLETE
+## Project Status: COMPLETE (Security Hardened)
 
-A full-stack web application for tracking employee hourly work across different clients has been successfully built and is ready for use.
-
----
-
-## 📋 Requirements Met
-
-All original requirements have been fully implemented:
-
-- ✅ **User authentication** - Email-based login with JWT tokens
-- ✅ **Client management** - Full CRUD operations (Create, Read, Update, Delete)
-- ✅ **Work entry management** - Track hourly work with date, hours, and descriptions
-- ✅ **Reporting** - View detailed reports for each client
-- ✅ **Export functionality** - Export reports to CSV and PDF formats
+A full-stack web application for tracking employee hourly work across different clients, with comprehensive security features including password-based authentication, CSRF protection, role-based access control, and account lockout.
 
 ---
 
-## 🏗️ Architecture Overview
+## Requirements Met
 
-### Frontend (React + TypeScript + Material UI)
-- **Framework**: React 18 with TypeScript
+All original requirements plus security hardening have been implemented:
+
+- **Password-based authentication** - bcrypt hashing (12 salt rounds) with JWT tokens
+- **User registration** - Email + password with validation (8+ chars, uppercase, lowercase, number)
+- **CSRF protection** - Double-submit cookie pattern via csrf-csrf
+- **Role-based access control** - Admin and user roles with middleware enforcement
+- **Account lockout** - 5 failed attempts triggers 15-minute lockout
+- **Client management** - Full CRUD operations (Create, Read, Update, Delete)
+- **Work entry management** - Track hourly work with date, hours, and descriptions
+- **Reporting** - View detailed reports for each client
+- **Export functionality** - Export reports to CSV and PDF formats
+- **File-based SQLite** - Persistent data storage across server restarts
+
+---
+
+## Architecture Overview
+
+### Frontend (React 19 + TypeScript + Material UI)
+- **Framework**: React 19 with TypeScript
 - **Build Tool**: Vite for fast development and optimized builds
 - **UI Library**: Material UI for professional, responsive design
 - **State Management**: React Query for server state, Context API for auth
 - **Routing**: React Router v6 for navigation
-- **HTTP Client**: Axios with JWT interceptors
+- **HTTP Client**: Axios with JWT and CSRF token interceptors
 
 **Key Pages:**
-- Login Page - Email-based authentication
+- Login/Register Page - Password-based authentication with tabs
 - Dashboard - Overview with statistics and recent entries
 - Clients Page - Manage client list with add/edit/delete
 - Work Entries Page - Track time with date picker and client selection
@@ -37,82 +42,106 @@ All original requirements have been fully implemented:
 
 ### Backend (Node.js + Express)
 - **Runtime**: Node.js with Express framework
-- **Database**: SQLite in-memory (as specified)
-- **Authentication**: JWT tokens with 24-hour expiration
-- **Validation**: Joi schemas for input validation
-- **Security**: CORS, Helmet, Rate Limiting
+- **Database**: SQLite file-based (persistent via `./data/timesheet.db`)
+- **Authentication**: JWT tokens with 8-hour expiration, issuer/audience claims
+- **Password Hashing**: bcryptjs with 12 salt rounds
+- **CSRF**: csrf-csrf double-submit cookie pattern
+- **Validation**: Joi schemas for all input including password strength
+- **Security**: CORS, Helmet with CSP, Rate Limiting, Account Lockout
 - **Export**: PDFKit for PDF, csv-writer for CSV
 
 **API Structure:**
-- `/api/auth/*` - Authentication endpoints
-- `/api/clients/*` - Client CRUD operations
+- `/api/auth/*` - Authentication endpoints (login, register, me)
+- `/api/csrf-token` - CSRF token endpoint
+- `/api/clients/*` - Client CRUD operations (role-aware)
 - `/api/work-entries/*` - Work entry management
 - `/api/reports/*` - Reporting and export
 
 ---
 
-## 🔒 Security Features Implemented
+## Security Features
 
-1. **JWT Authentication**
-   - Secure token-based authentication
-   - 24-hour token expiration
+1. **Password Authentication**
+   - bcryptjs hashing with 12 salt rounds
+   - Password validation: min 8 chars, uppercase, lowercase, number
+   - Secure password comparison
+
+2. **JWT Configuration**
+   - 8-hour token expiration
+   - Issuer and audience claims for validation
+   - 32+ character secret required in production
    - Bearer token in Authorization header
-   - Automatic token refresh on page load
 
-2. **Rate Limiting**
-   - 5 login attempts per 15 minutes per IP
-   - Prevents brute force attacks
+3. **CSRF Protection**
+   - Double-submit cookie pattern (csrf-csrf)
+   - Token required for all POST/PUT/DELETE requests
+   - httpOnly cookie with sameSite strict
 
-3. **Input Validation**
+4. **Account Lockout**
+   - 5 failed login attempts trigger lockout
+   - 15-minute lockout duration
+   - Tracked in database (failed_login_attempts, locked_until)
+
+5. **Rate Limiting**
+   - Auth endpoints: 5 attempts per 15 minutes per IP
+   - General endpoints: 100 requests per 15 minutes per IP
+
+6. **Role-Based Access Control**
+   - `user` role: manage own clients and work entries
+   - `admin` role: manage all clients across all users
+   - Authorize middleware for role checking
+
+7. **Input Validation & Security Headers**
    - Joi schemas validate all user input
    - SQL injection protection via parameterized queries
-   - Email format validation
-
-4. **Security Headers**
-   - Helmet middleware for security headers
+   - Helmet with Content Security Policy
    - CORS configuration for trusted origins
-   - XSS protection
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
-general/
+.
 ├── backend/
 │   ├── src/
-│   │   ├── database/init.js          # SQLite setup
+│   │   ├── database/init.js          # SQLite setup (file-based)
 │   │   ├── middleware/
 │   │   │   ├── auth.js               # JWT authentication
-│   │   │   └── errorHandler.js      # Error handling
+│   │   │   ├── authorize.js          # Role-based access control
+│   │   │   └── errorHandler.js       # Error handling (incl. CSRF)
 │   │   ├── routes/
-│   │   │   ├── auth.js               # Login endpoints
-│   │   │   ├── clients.js            # Client CRUD
+│   │   │   ├── auth.js               # Login/register/lockout
+│   │   │   ├── clients.js            # Client CRUD (role-aware)
 │   │   │   ├── workEntries.js        # Time tracking
 │   │   │   └── reports.js            # Reports & export
 │   │   ├── validation/schemas.js     # Input validation
 │   │   └── server.js                 # Express app
+│   ├── data/                         # SQLite database (gitignored)
 │   ├── package.json
 │   ├── DEPLOYMENT.md                 # Production guide
 │   └── .env.example
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── api/client.ts             # API client
-│   │   ├── components/Layout.tsx     # Main layout
-│   │   ├── contexts/AuthContext.tsx  # Auth state
+│   │   ├── api/client.ts             # API client (JWT + CSRF)
+│   │   ├── components/Layout.tsx      # Main layout
+│   │   ├── contexts/
+│   │   │   ├── AuthContext.tsx        # Auth state
+│   │   │   └── AuthContextValue.ts   # Auth context types
 │   │   ├── pages/                    # All page components
 │   │   ├── types/api.ts              # TypeScript types
 │   │   └── App.tsx                   # Root component
 │   ├── package.json
 │   └── .env.example
 │
-└── README.md                          # Complete documentation
+├── docker/                           # Docker configuration
+└── README.md                         # Complete documentation
 ```
 
 ---
 
-## 🚀 How to Run
+## How to Run
 
 ### Quick Start (Development)
 
@@ -120,6 +149,7 @@ general/
 ```bash
 cd backend
 npm install
+cp .env.example .env
 npm run dev
 # Server runs on http://localhost:3001
 ```
@@ -133,135 +163,61 @@ npm run dev
 ```
 
 **Access the app:**
-Open http://localhost:5173 and log in with any email address.
+Open http://localhost:5173, register with email and password, then log in.
 
 ---
 
-## ⚠️ Important Considerations
+## Environment Variables
 
-### Data Persistence
-- **In-memory database** means all data is lost on server restart
-- Suitable for development and testing
-- For production, modify `backend/src/database/init.js` to use file-based SQLite
-
-### Authentication
-- Email-only authentication (no password)
-- Assumes trusted internal network
-- Consider SSO integration for production
-
-### Environment Variables
-- Set strong `JWT_SECRET` in production
-- Configure `FRONTEND_URL` for CORS
-- See `.env.example` files for all options
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `JWT_SECRET` | Yes (prod) | JWT signing secret (32+ chars in production) |
+| `CSRF_SECRET` | Yes (prod) | CSRF token secret |
+| `DATABASE_PATH` | No | SQLite database path (default: `./data/timesheet.db`) |
+| `PORT` | No | Server port (default: 3001) |
+| `NODE_ENV` | No | Environment (development/production) |
+| `FRONTEND_URL` | No | Frontend URL for CORS (default: `http://localhost:5173`) |
 
 ---
 
-## 🎨 User Interface Features
+## Testing
+
+192 tests across 9 test suites covering:
+- Database initialization and schema
+- Authentication (login, register, account lockout)
+- JWT middleware (token validation, expiry, issuer/audience)
+- Authorization middleware (role-based access)
+- Client CRUD operations
+- Work entry CRUD operations
+- Report generation and export
+- Input validation schemas (including password rules)
+- Error handling (including CSRF errors)
+
+```bash
+cd backend
+npm test                    # Run all tests
+npm run test:coverage       # Run tests with coverage
+```
+
+---
+
+## User Interface Features
 
 - **Responsive Design** - Works on desktop, tablet, and mobile
 - **Material Design** - Professional, modern UI components
-- **Dark Mode Ready** - Material UI theme system
+- **Login/Register Tabs** - Easy account creation
+- **Password Validation** - Real-time feedback on password requirements
+- **Error Handling** - Clear error messages for auth failures and lockouts
 - **Intuitive Navigation** - Sidebar navigation with icons
-- **Form Validation** - Real-time validation feedback
-- **Loading States** - Spinners and skeleton screens
-- **Error Handling** - User-friendly error messages
-- **Confirmation Dialogs** - Prevent accidental deletions
 
 ---
 
-## 📊 Technical Highlights
+## Known Limitations
 
-### Frontend
-- TypeScript strict mode for type safety
-- React Query for efficient data fetching and caching
-- Axios interceptors for automatic JWT token injection
-- Material UI date picker for work entry dates
-- Blob handling for file downloads (CSV/PDF)
+1. **SQLite** - Not suitable for high-concurrency production workloads
+2. **Single-server architecture** - Not designed for horizontal scaling
+3. **No real-time updates** - Changes require page refresh
 
-### Backend
-- Modular route structure for maintainability
-- Middleware chain for authentication and validation
-- Async/await error handling
-- Database indexes for query performance
-- Parameterized queries for SQL injection prevention
+## License
 
----
-
-## 🧪 Code Quality
-
-- ✅ TypeScript strict mode enabled
-- ✅ All lint errors resolved
-- ✅ Type-safe API interfaces
-- ✅ Proper error handling throughout
-- ✅ Input validation on all endpoints
-- ✅ Security best practices followed
-
----
-
-## 📈 Performance Optimizations
-
-- React Query caching reduces API calls
-- Optimistic updates for better UX
-- Lazy loading for route components
-- Vite for fast development builds
-- Production builds optimized and minified
-
----
-
-## 🔄 Development Workflow
-
-1. **Backend changes**: Auto-reload with nodemon
-2. **Frontend changes**: Hot Module Replacement (HMR) with Vite
-3. **Type safety**: TypeScript catches errors at compile time
-4. **API testing**: Use curl or Postman with JWT tokens
-
----
-
-## 📝 Next Steps for Production
-
-1. **Database**: Switch to file-based SQLite or PostgreSQL
-2. **Authentication**: Integrate with company SSO
-3. **Environment**: Set strong JWT_SECRET
-4. **Deployment**: Follow DEPLOYMENT.md guide
-5. **Monitoring**: Set up logging and error tracking
-6. **Backups**: Implement database backup strategy
-7. **HTTPS**: Configure SSL certificates
-8. **Testing**: Add unit and integration tests
-
----
-
-## 🎓 Learning Outcomes
-
-This project demonstrates:
-- Full-stack TypeScript development
-- JWT authentication implementation
-- RESTful API design
-- React state management patterns
-- Material UI component library
-- Database design and querying
-- File generation (PDF/CSV)
-- Security best practices
-
----
-
-## 📞 Support
-
-For questions or issues:
-1. Check the README.md for setup instructions
-2. Review DEPLOYMENT.md for production guidance
-3. Examine code comments for implementation details
-4. Contact your system administrator
-
----
-
-## ✨ Summary
-
-A production-ready time tracking application has been successfully built with:
-- Modern, responsive UI
-- Secure JWT authentication
-- Complete CRUD operations
-- Export functionality
-- Comprehensive documentation
-- Security best practices
-
-The application is ready for development use and can be deployed to production with the recommended modifications outlined in the documentation.
+MIT
