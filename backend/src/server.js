@@ -57,24 +57,17 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100
-});
-app.use(limiter);
-
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Prometheus metrics endpoint (excluded from rate limiting)
+// Prometheus metrics endpoint (registered before rate limiter)
 app.get('/metrics', async (req, res) => {
   res.set('Content-Type', register.contentType);
   res.end(await register.metrics());
 });
 
-// Health check endpoints
+// Health check endpoints (registered before rate limiter)
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
@@ -90,6 +83,13 @@ app.get('/health/ready', (req, res) => {
     res.status(503).json({ status: 'not ready', timestamp: new Date().toISOString() });
   }
 });
+
+// Rate limiting (applied only to /api routes)
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100
+});
+app.use('/api', limiter);
 
 // Routes
 app.use('/api/auth', authRoutes);

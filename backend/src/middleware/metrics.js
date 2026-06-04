@@ -30,7 +30,7 @@ function normalizeRoute(req) {
   if (req.route && req.route.path) {
     return req.baseUrl + req.route.path;
   }
-  return req.path;
+  return 'unmatched';
 }
 
 function metricsMiddleware(req, res, next) {
