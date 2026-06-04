@@ -46,13 +46,17 @@ A full-stack web application for tracking and reporting employee hourly work acr
 
 ```
 .
+├── .github/
+│   └── workflows/
+│       └── ci.yml                # CI/CD pipeline (lint, test, build, Docker)
 ├── backend/
 │   ├── src/
+│   │   ├── __tests__/            # Jest test suites (161 tests)
 │   │   ├── database/
 │   │   │   └── init.js           # Database initialization
 │   │   ├── middleware/
 │   │   │   ├── auth.js           # JWT authentication
-│   │   │   └── errorHandler.js  # Error handling
+│   │   │   └── errorHandler.js   # Error handling
 │   │   ├── routes/
 │   │   │   ├── auth.js           # Authentication endpoints
 │   │   │   ├── clients.js        # Client CRUD
@@ -61,8 +65,13 @@ A full-stack web application for tracking and reporting employee hourly work acr
 │   │   ├── validation/
 │   │   │   └── schemas.js        # Joi validation schemas
 │   │   └── server.js             # Express server
+│   ├── eslint.config.mjs         # ESLint config (Node/CommonJS + Jest)
 │   ├── package.json
 │   └── DEPLOYMENT.md             # Production deployment guide
+│
+├── docker/
+│   ├── Dockerfile                # Multi-stage production Docker build
+│   └── overrides/                # Production file overrides
 │
 └── frontend/
     ├── src/
@@ -71,7 +80,7 @@ A full-stack web application for tracking and reporting employee hourly work acr
     │   ├── components/
     │   │   └── Layout.tsx        # Main layout
     │   ├── contexts/
-    │   │   └── AuthContext.tsx   # Auth state management
+    │   │   └── AuthContext.tsx    # Auth state management
     │   ├── pages/
     │   │   ├── LoginPage.tsx     # Login page
     │   │   ├── DashboardPage.tsx # Dashboard
@@ -81,6 +90,7 @@ A full-stack web application for tracking and reporting employee hourly work acr
     │   ├── types/
     │   │   └── api.ts            # TypeScript interfaces
     │   └── App.tsx               # Main app component
+    ├── eslint.config.js          # ESLint config (React/TypeScript)
     └── package.json
 ```
 
@@ -239,6 +249,49 @@ Coverage thresholds are configured in `jest.config.js`:
 - Branches: 60%
 - Functions: 65%
 - Lines: 60%
+
+## CI/CD Pipeline
+
+The project includes a GitHub Actions CI/CD pipeline (`.github/workflows/ci.yml`) that runs on every pull request to `main` and on pushes to `main`.
+
+### Pipeline Overview
+
+| Job | Node Versions | Steps |
+|-----|---------------|-------|
+| **Backend** | 18, 20 | Install → Lint (ESLint) → Test w/ coverage → Build check → Security audit → Upload coverage artifact |
+| **Frontend** | 18, 20 | Install → Lint (ESLint) → Build production bundle → Security audit |
+| **Docker** | — | Build & push Docker image to GHCR (runs after backend + frontend pass) |
+
+### Triggers
+
+- **Pull requests** to `main` — runs all jobs; Docker image is built but **not** pushed
+- **Push** to `main` — runs all jobs; Docker image is built **and pushed** to GitHub Container Registry
+
+### Matrix Strategy
+
+Both backend and frontend jobs run on **Node 18** and **Node 20** to ensure compatibility across supported versions.
+
+### Docker Build & Push
+
+- Uses the existing multi-stage `docker/Dockerfile`
+- Pushes to `ghcr.io/<owner>/timesheet-app` on merge to `main`
+- Image tags: commit SHA, branch name, PR number
+- Docker layer caching via GitHub Actions cache
+
+### Test Coverage Artifact
+
+Backend test coverage reports are uploaded as a build artifact (`backend-coverage`) on the Node 20 run, retained for 14 days. Download from the workflow run's **Artifacts** section in the GitHub Actions UI.
+
+### Linting
+
+- **Backend**: ESLint with `@eslint/js` recommended rules, configured for Node.js/CommonJS with Jest test globals (`eslint.config.mjs`)
+- **Frontend**: ESLint with TypeScript and React plugins (`eslint.config.js`)
+
+Run linting locally:
+```bash
+cd backend && npm run lint
+cd frontend && npm run lint
+```
 
 ### Building for Production
 
