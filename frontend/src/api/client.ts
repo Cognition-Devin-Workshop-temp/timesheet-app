@@ -133,6 +133,57 @@ class ApiClient {
     return response.data;
   }
 
+  // Team endpoints
+  async getTeams() {
+    const response = await this.client.get('/api/teams');
+    return response.data;
+  }
+
+  async createTeam(data: { name: string }) {
+    const response = await this.client.post('/api/teams', data);
+    return response.data;
+  }
+
+  async getTeam(teamId: number) {
+    const response = await this.client.get(`/api/teams/${teamId}`);
+    return response.data;
+  }
+
+  async updateTeam(teamId: number, data: { name: string }) {
+    const response = await this.client.put(`/api/teams/${teamId}`, data);
+    return response.data;
+  }
+
+  async deleteTeam(teamId: number) {
+    const response = await this.client.delete(`/api/teams/${teamId}`);
+    return response.data;
+  }
+
+  async addTeamMember(teamId: number, data: { email: string; displayName: string; weeklyCapacityHours?: number }) {
+    const response = await this.client.post(`/api/teams/${teamId}/members`, data);
+    return response.data;
+  }
+
+  async updateTeamMember(teamId: number, email: string, data: { displayName?: string; weeklyCapacityHours?: number }) {
+    const response = await this.client.put(`/api/teams/${teamId}/members/${encodeURIComponent(email)}`, data);
+    return response.data;
+  }
+
+  async removeTeamMember(teamId: number, email: string) {
+    const response = await this.client.delete(`/api/teams/${teamId}/members/${encodeURIComponent(email)}`);
+    return response.data;
+  }
+
+  async getTeamWorkload(teamId: number, startDate: string, endDate: string) {
+    const response = await this.client.get(`/api/teams/${teamId}/workload`, { params: { startDate, endDate } });
+    return response.data;
+  }
+
+  async getTeamWorkloadBreakdown(teamId: number, startDate: string, endDate: string) {
+    const response = await this.client.get(`/api/teams/${teamId}/workload/breakdown`, { params: { startDate, endDate } });
+    return response.data;
+  }
+
   // Health check
   async healthCheck() {
     const response = await this.client.get('/health');
