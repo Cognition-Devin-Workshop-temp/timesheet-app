@@ -1,4 +1,5 @@
 import axios, { type AxiosInstance, type AxiosResponse } from 'axios';
+import type { CreateInvoiceRequest, UpdateInvoiceRequest, UpdateBillingProfileRequest } from '../types/api';
 
 // Use empty string to make requests relative to the current origin
 // Vite proxy will forward /api requests to the backend
@@ -66,12 +67,12 @@ class ApiClient {
     return response.data;
   }
 
-  async createClient(clientData: { name: string; description?: string; department?: string; email?: string }) {
+  async createClient(clientData: { name: string; description?: string; department?: string; email?: string; billingAddress?: string; hourlyRate?: number | null; currency?: string }) {
     const response = await this.client.post('/api/clients', clientData);
     return response.data;
   }
 
-  async updateClient(id: number, clientData: { name?: string; description?: string; department?: string; email?: string }) {
+  async updateClient(id: number, clientData: { name?: string; description?: string; department?: string; email?: string; billingAddress?: string; hourlyRate?: number | null; currency?: string }) {
     const response = await this.client.put(`/api/clients/${id}`, clientData);
     return response.data;
   }
@@ -130,6 +131,65 @@ class ApiClient {
     const response = await this.client.get(`/api/reports/export/pdf/${clientId}`, {
       responseType: 'blob',
     });
+    return response.data;
+  }
+
+  // Invoice endpoints
+  async getInvoices(params?: { status?: string; clientId?: number; from?: string; to?: string; page?: number; limit?: number }) {
+    const response = await this.client.get('/api/invoices', { params });
+    return response.data;
+  }
+
+  async getInvoice(id: number) {
+    const response = await this.client.get(`/api/invoices/${id}`);
+    return response.data;
+  }
+
+  async getInvoiceSummary() {
+    const response = await this.client.get('/api/invoices/summary');
+    return response.data;
+  }
+
+  async createInvoice(data: CreateInvoiceRequest) {
+    const response = await this.client.post('/api/invoices', data);
+    return response.data;
+  }
+
+  async updateInvoice(id: number, data: UpdateInvoiceRequest) {
+    const response = await this.client.put(`/api/invoices/${id}`, data);
+    return response.data;
+  }
+
+  async updateInvoiceStatus(id: number, status: string) {
+    const response = await this.client.patch(`/api/invoices/${id}/status`, { status });
+    return response.data;
+  }
+
+  async deleteInvoice(id: number) {
+    const response = await this.client.delete(`/api/invoices/${id}`);
+    return response.data;
+  }
+
+  async downloadInvoicePdf(id: number) {
+    const response = await this.client.get(`/api/invoices/${id}/pdf`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  async getUninvoicedWorkEntries(clientId: number, params?: { dateFrom?: string; dateTo?: string }) {
+    const response = await this.client.get(`/api/invoices/uninvoiced/${clientId}`, { params });
+    return response.data;
+  }
+
+  // Billing profile endpoints
+  async getBillingProfile() {
+    const response = await this.client.get('/api/billing-profile');
+    return response.data;
+  }
+
+  async updateBillingProfile(data: UpdateBillingProfileRequest) {
+    const response = await this.client.put('/api/billing-profile', data);
     return response.data;
   }
 

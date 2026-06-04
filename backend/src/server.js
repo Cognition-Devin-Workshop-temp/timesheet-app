@@ -8,6 +8,8 @@ const authRoutes = require('./routes/auth');
 const clientRoutes = require('./routes/clients');
 const workEntryRoutes = require('./routes/workEntries');
 const reportRoutes = require('./routes/reports');
+const invoiceRoutes = require('./routes/invoices');
+const billingProfileRoutes = require('./routes/billingProfile');
 
 const { initializeDatabase } = require('./database/init');
 const { errorHandler } = require('./middleware/errorHandler');
@@ -46,6 +48,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/work-entries', workEntryRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/invoices', invoiceRoutes);
+app.use('/api/billing-profile', billingProfileRoutes);
 
 // Error handling
 app.use(errorHandler);

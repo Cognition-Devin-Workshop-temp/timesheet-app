@@ -43,6 +43,9 @@ async function initializeDatabase() {
           description TEXT,
           department TEXT,
           email TEXT,
+          billing_address TEXT,
+          hourly_rate DECIMAL(10,2),
+          currency TEXT DEFAULT 'USD',
           user_email TEXT NOT NULL,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -66,11 +69,74 @@ async function initializeDatabase() {
         )
       `);
 
+      // Create user_billing_profiles table
+      database.run(`
+        CREATE TABLE IF NOT EXISTS user_billing_profiles (
+          user_email TEXT PRIMARY KEY,
+          company_name TEXT,
+          billing_address TEXT,
+          phone TEXT,
+          default_payment_terms_days INTEGER DEFAULT 30,
+          default_tax_rate DECIMAL(5,4) DEFAULT 0,
+          default_currency TEXT DEFAULT 'USD',
+          invoice_prefix TEXT DEFAULT 'INV',
+          next_invoice_seq INTEGER DEFAULT 1,
+          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
+        )
+      `);
+
+      // Create invoices table
+      database.run(`
+        CREATE TABLE IF NOT EXISTS invoices (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          invoice_number TEXT NOT NULL,
+          client_id INTEGER NOT NULL,
+          user_email TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'draft',
+          issue_date DATE NOT NULL,
+          due_date DATE NOT NULL,
+          payment_terms_days INTEGER DEFAULT 30,
+          subtotal DECIMAL(10,2) NOT NULL,
+          tax_rate DECIMAL(5,4) DEFAULT 0,
+          tax_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+          total DECIMAL(10,2) NOT NULL,
+          notes TEXT,
+          from_name TEXT,
+          from_address TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (client_id) REFERENCES clients (id),
+          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
+        )
+      `);
+
+      // Create invoice_line_items table
+      database.run(`
+        CREATE TABLE IF NOT EXISTS invoice_line_items (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          invoice_id INTEGER NOT NULL,
+          work_entry_id INTEGER,
+          description TEXT NOT NULL,
+          date DATE,
+          hours DECIMAL(5,2) NOT NULL,
+          rate DECIMAL(10,2) NOT NULL,
+          amount DECIMAL(10,2) NOT NULL,
+          sort_order INTEGER DEFAULT 0,
+          FOREIGN KEY (invoice_id) REFERENCES invoices (id) ON DELETE CASCADE,
+          FOREIGN KEY (work_entry_id) REFERENCES work_entries (id) ON DELETE SET NULL
+        )
+      `);
+
       // Create indexes for better performance
       database.run(`CREATE INDEX IF NOT EXISTS idx_clients_user_email ON clients (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_invoices_user_email ON invoices (user_email)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_invoices_client_id ON invoices (client_id)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices (status)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_invoice_line_items_invoice_id ON invoice_line_items (invoice_id)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_invoice_line_items_work_entry_id ON invoice_line_items (work_entry_id)`);
 
       console.log('Database tables created successfully');
       resolve();

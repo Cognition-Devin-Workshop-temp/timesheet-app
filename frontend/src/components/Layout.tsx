@@ -21,6 +21,8 @@ import {
   Business as BusinessIcon,
   Assignment as AssignmentIcon,
   Assessment as AssessmentIcon,
+  Receipt as ReceiptIcon,
+  Settings as SettingsIcon,
   Logout as LogoutIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -47,6 +49,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { text: 'Clients', icon: <BusinessIcon />, path: '/clients' },
     { text: 'Work Entries', icon: <AssignmentIcon />, path: '/work-entries' },
     { text: 'Reports', icon: <AssessmentIcon />, path: '/reports' },
+    { text: 'Invoices', icon: <ReceiptIcon />, path: '/invoices' },
+    { text: 'Billing Profile', icon: <SettingsIcon />, path: '/billing-profile' },
   ];
 
   const drawer = (
