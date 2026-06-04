@@ -45,16 +45,21 @@ router.post('/register', async (req, res, next) => {
             return res.status(500).json({ error: 'Failed to create user' });
           }
 
-          const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+          try {
+            const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
 
-          res.status(201).json({
-            message: 'User registered successfully',
-            token,
-            user: {
-              email: email,
-              createdAt: new Date().toISOString()
-            }
-          });
+            res.status(201).json({
+              message: 'User registered successfully',
+              token,
+              user: {
+                email: email,
+                createdAt: new Date().toISOString()
+              }
+            });
+          } catch (signError) {
+            console.error('Error signing token:', signError);
+            return res.status(500).json({ error: 'Internal server error' });
+          }
         });
       } catch (hashError) {
         console.error('Error hashing password:', hashError);
