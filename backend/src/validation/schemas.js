@@ -32,10 +32,16 @@ const emailSchema = Joi.object({
   email: Joi.string().email().required()
 });
 
+const authSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().min(8).required()
+});
+
 module.exports = {
   clientSchema,
   workEntrySchema,
   updateWorkEntrySchema,
   updateClientSchema,
-  emailSchema
+  emailSchema,
+  authSchema
 };
