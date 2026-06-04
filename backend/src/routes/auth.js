@@ -16,39 +16,29 @@ router.post('/login', async (req, res, next) => {
     const { email } = value;
     const db = getDatabase();
 
-    // Check if user exists
-    db.get('SELECT email, created_at FROM users WHERE email = ?', [email], (err, row) => {
+    // Upsert user in a single statement to avoid race conditions under load
+    db.run('INSERT OR IGNORE INTO users (email) VALUES (?)', [email], function(err) {
       if (err) {
         console.error('Database error:', err);
         return res.status(500).json({ error: 'Internal server error' });
       }
 
-      if (row) {
-        // User exists
-        return res.json({
-          message: 'Login successful',
+      const created = this.changes > 0;
+
+      db.get('SELECT email, created_at FROM users WHERE email = ?', [email], (err, row) => {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'Internal server error' });
+        }
+
+        res.status(created ? 201 : 200).json({
+          message: created ? 'User created and logged in successfully' : 'Login successful',
           user: {
             email: row.email,
             createdAt: row.created_at
           }
         });
-      } else {
-        // Create new user
-        db.run('INSERT INTO users (email) VALUES (?)', [email], function(err) {
-          if (err) {
-            console.error('Error creating user:', err);
-            return res.status(500).json({ error: 'Failed to create user' });
-          }
-
-          res.status(201).json({
-            message: 'User created and logged in successfully',
-            user: {
-              email: email,
-              createdAt: new Date().toISOString()
-            }
-          });
-        });
-      }
+      });
     });
   } catch (error) {
     next(error);

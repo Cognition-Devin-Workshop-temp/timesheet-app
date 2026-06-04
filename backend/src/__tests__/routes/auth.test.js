@@ -38,6 +38,12 @@ describe('Auth Routes', () => {
         created_at: '2024-01-01T00:00:00.000Z'
       };
 
+      // INSERT OR IGNORE succeeds with 0 changes (user already exists)
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        callback.call({ changes: 0 }, null);
+      });
+
+      // Then SELECT returns the existing user
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(null, existingUser);
       });
@@ -52,12 +58,17 @@ describe('Auth Routes', () => {
     });
 
     test('should create new user on first login', async () => {
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, null); // User doesn't exist
+      // INSERT OR IGNORE succeeds with 1 change (new user created)
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        callback.call({ changes: 1 }, null);
       });
 
-      mockDb.run.mockImplementation(function(query, params, callback) {
-        callback.call(this, null);
+      // Then SELECT returns the new user
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, {
+          email: 'newuser@example.com',
+          created_at: '2024-01-01T00:00:00.000Z'
+        });
       });
 
       const response = await request(app)
@@ -68,7 +79,7 @@ describe('Auth Routes', () => {
       expect(response.body.message).toBe('User created and logged in successfully');
       expect(response.body.user.email).toBe('newuser@example.com');
       expect(mockDb.run).toHaveBeenCalledWith(
-        'INSERT INTO users (email) VALUES (?)',
+        'INSERT OR IGNORE INTO users (email) VALUES (?)',
         ['newuser@example.com'],
         expect.any(Function)
       );
@@ -92,9 +103,9 @@ describe('Auth Routes', () => {
       expect(response.body.error).toBe('Validation error');
     });
 
-    test('should handle database error when checking user', async () => {
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(new Error('Database error'), null);
+    test('should handle database error on insert', async () => {
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        callback.call(this, new Error('Database error'));
       });
 
       const response = await request(app)
@@ -105,21 +116,21 @@ describe('Auth Routes', () => {
       expect(response.body).toEqual({ error: 'Internal server error' });
     });
 
-    test('should handle database error when creating user', async () => {
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, null);
+    test('should handle database error when fetching user after insert', async () => {
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        callback.call({ changes: 0 }, null);
       });
 
-      mockDb.run.mockImplementation((query, params, callback) => {
-        callback(new Error('Insert failed'));
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(new Error('Select failed'), null);
       });
 
       const response = await request(app)
         .post('/api/auth/login')
-        .send({ email: 'newuser@example.com' });
+        .send({ email: 'test@example.com' });
 
       expect(response.status).toBe(500);
-      expect(response.body).toEqual({ error: 'Failed to create user' });
+      expect(response.body).toEqual({ error: 'Internal server error' });
     });
 
     test('should handle unexpected errors in try-catch block', async () => {
@@ -143,6 +154,12 @@ describe('Auth Routes', () => {
         created_at: '2024-01-01T00:00:00.000Z'
       };
 
+      // Auth middleware: INSERT OR IGNORE
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        callback.call(this, null);
+      });
+
+      // /me endpoint: SELECT user
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(null, user);
       });
@@ -164,14 +181,14 @@ describe('Auth Routes', () => {
     });
 
     test('should return 404 if user not found', async () => {
+      // Auth middleware: INSERT OR IGNORE
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        callback.call(this, null);
+      });
+
+      // /me endpoint: SELECT returns null
       mockDb.get.mockImplementation((query, params, callback) => {
-        if (query.includes('SELECT email FROM users WHERE email = ?')) {
-          // Auth middleware check
-          callback(null, { email: 'test@example.com' });
-        } else {
-          // /me endpoint check
-          callback(null, null);
-        }
+        callback(null, null);
       });
 
       const response = await request(app)
@@ -183,12 +200,14 @@ describe('Auth Routes', () => {
     });
 
     test('should handle database error', async () => {
+      // Auth middleware: INSERT OR IGNORE
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        callback.call(this, null);
+      });
+
+      // /me endpoint: SELECT fails
       mockDb.get.mockImplementation((query, params, callback) => {
-        if (query.includes('SELECT email FROM users WHERE email = ?')) {
-          callback(null, { email: 'test@example.com' });
-        } else {
-          callback(new Error('Database error'), null);
-        }
+        callback(new Error('Database error'), null);
       });
 
       const response = await request(app)
