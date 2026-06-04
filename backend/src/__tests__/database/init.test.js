@@ -1,4 +1,4 @@
-const sqlite3 = require('sqlite3');
+const _sqlite3 = require('sqlite3');
 const { getDatabase, initializeDatabase, closeDatabase } = require('../../database/init');
 
 // Mock sqlite3
