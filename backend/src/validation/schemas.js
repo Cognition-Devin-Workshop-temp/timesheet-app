@@ -1,5 +1,7 @@
 const Joi = require('joi');
 
+const timePattern = /^(0?[1-9]|1[0-2]):[0-5][0-9]\s?(AM|PM)$/i;
+
 const clientSchema = Joi.object({
   name: Joi.string().trim().min(1).max(255).required(),
   description: Joi.string().trim().max(1000).optional().allow(''),
@@ -11,14 +13,18 @@ const workEntrySchema = Joi.object({
   clientId: Joi.number().integer().positive().required(),
   hours: Joi.number().positive().max(24).precision(2).required(),
   description: Joi.string().trim().max(1000).optional().allow(''),
-  date: Joi.date().iso().required()
+  date: Joi.date().iso().required(),
+  swipeIn: Joi.string().trim().pattern(timePattern).optional().allow('', null),
+  swipeOut: Joi.string().trim().pattern(timePattern).optional().allow('', null)
 });
 
 const updateWorkEntrySchema = Joi.object({
   clientId: Joi.number().integer().positive().optional(),
   hours: Joi.number().positive().max(24).precision(2).optional(),
   description: Joi.string().trim().max(1000).optional().allow(''),
-  date: Joi.date().iso().optional()
+  date: Joi.date().iso().optional(),
+  swipeIn: Joi.string().trim().pattern(timePattern).optional().allow('', null),
+  swipeOut: Joi.string().trim().pattern(timePattern).optional().allow('', null)
 }).min(1); // At least one field must be provided
 
 const updateClientSchema = Joi.object({

@@ -19,6 +19,8 @@ export interface WorkEntry {
   hours: number;
   description: string | null;
   date: string;
+  swipe_in: string | null;
+  swipe_out: string | null;
   created_at: string;
   updated_at: string;
   client_name?: string;
@@ -54,6 +56,8 @@ export interface CreateWorkEntryRequest {
   hours: number;
   description?: string;
   date: string;
+  swipeIn?: string;
+  swipeOut?: string;
 }
 
 export interface UpdateWorkEntryRequest {
@@ -61,6 +65,8 @@ export interface UpdateWorkEntryRequest {
   hours?: number;
   description?: string;
   date?: string;
+  swipeIn?: string;
+  swipeOut?: string;
 }
 
 export interface LoginRequest {

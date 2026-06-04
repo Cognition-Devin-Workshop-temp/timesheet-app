@@ -23,6 +23,8 @@ import {
   Select,
   MenuItem,
   Chip,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -36,6 +38,20 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import apiClient from '../api/client';
 import { type WorkEntry } from '../types/api';
 
+const calculateHoursFromSwipe = (inTime: string, inPeriod: string, outTime: string, outPeriod: string): number | null => {
+  if (!inTime || !outTime) return null;
+  const [inH, inM] = inTime.split(':').map(Number);
+  const [outH, outM] = outTime.split(':').map(Number);
+  if (isNaN(inH) || isNaN(inM) || isNaN(outH) || isNaN(outM)) return null;
+
+  const inMinutes = (inH % 12) * 60 + inM + (inPeriod === 'PM' ? 720 : 0);
+  const outMinutes = (outH % 12) * 60 + outM + (outPeriod === 'PM' ? 720 : 0);
+  if (outMinutes <= inMinutes) return null;
+
+  const diff = (outMinutes - inMinutes) / 60;
+  return Math.round(diff * 100) / 100;
+};
+
 const WorkEntriesPage: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<WorkEntry | null>(null);
@@ -44,6 +60,11 @@ const WorkEntriesPage: React.FC = () => {
     hours: '',
     description: '',
     date: new Date(),
+    swipeIn: '',
+    swipeInPeriod: 'AM',
+    swipeOut: '',
+    swipeOutPeriod: 'PM',
+    isWfh: false,
   });
   const [error, setError] = useState('');
 
@@ -60,7 +81,7 @@ const WorkEntriesPage: React.FC = () => {
   });
 
   const createMutation = useMutation({
-    mutationFn: (entryData: { clientId: number; hours: number; description?: string; date: string }) =>
+    mutationFn: (entryData: { clientId: number; hours: number; description?: string; date: string; swipeIn?: string; swipeOut?: string }) =>
       apiClient.createWorkEntry(entryData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workEntries'] });
@@ -73,7 +94,7 @@ const WorkEntriesPage: React.FC = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { clientId?: number; hours?: number; description?: string; date?: string } }) =>
+    mutationFn: ({ id, data }: { id: number; data: { clientId?: number; hours?: number; description?: string; date?: string; swipeIn?: string; swipeOut?: string } }) =>
       apiClient.updateWorkEntry(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workEntries'] });
@@ -102,11 +123,22 @@ const WorkEntriesPage: React.FC = () => {
   const handleOpen = (entry?: WorkEntry) => {
     if (entry) {
       setEditingEntry(entry);
+      let swipeIn = '', swipeInPeriod = 'AM', swipeOut = '', swipeOutPeriod = 'PM';
+      if (entry.swipe_in) {
+        const parts = entry.swipe_in.match(/^(\d{1,2}:\d{2})\s*(AM|PM)$/i);
+        if (parts) { swipeIn = parts[1]; swipeInPeriod = parts[2].toUpperCase(); }
+      }
+      if (entry.swipe_out) {
+        const parts = entry.swipe_out.match(/^(\d{1,2}:\d{2})\s*(AM|PM)$/i);
+        if (parts) { swipeOut = parts[1]; swipeOutPeriod = parts[2].toUpperCase(); }
+      }
       setFormData({
         clientId: entry.client_id,
         hours: entry.hours.toString(),
         description: entry.description || '',
         date: new Date(entry.date),
+        swipeIn, swipeInPeriod, swipeOut, swipeOutPeriod,
+        isWfh: !entry.swipe_in && !entry.swipe_out,
       });
     } else {
       setEditingEntry(null);
@@ -115,6 +147,11 @@ const WorkEntriesPage: React.FC = () => {
         hours: '',
         description: '',
         date: new Date(),
+        swipeIn: '',
+        swipeInPeriod: 'AM',
+        swipeOut: '',
+        swipeOutPeriod: 'PM',
+        isWfh: false,
       });
     }
     setError('');
@@ -129,6 +166,11 @@ const WorkEntriesPage: React.FC = () => {
       hours: '',
       description: '',
       date: new Date(),
+      swipeIn: '',
+      swipeInPeriod: 'AM',
+      swipeOut: '',
+      swipeOutPeriod: 'PM',
+      isWfh: false,
     });
     setError('');
   };
@@ -153,12 +195,20 @@ const WorkEntriesPage: React.FC = () => {
       return;
     }
 
-    const entryData = {
+    const entryData: { clientId: number; hours: number; description?: string; date: string; swipeIn?: string; swipeOut?: string } = {
       clientId: formData.clientId,
       hours,
       description: formData.description || undefined,
       date: formData.date.toISOString().split('T')[0],
     };
+
+    if (!formData.isWfh && formData.swipeIn && formData.swipeOut) {
+      entryData.swipeIn = `${formData.swipeIn} ${formData.swipeInPeriod}`;
+      entryData.swipeOut = `${formData.swipeOut} ${formData.swipeOutPeriod}`;
+    } else {
+      entryData.swipeIn = '';
+      entryData.swipeOut = '';
+    }
 
     if (editingEntry) {
       updateMutation.mutate({
@@ -217,6 +267,8 @@ const WorkEntriesPage: React.FC = () => {
                   <TableRow>
                     <TableCell>Client</TableCell>
                     <TableCell>Date</TableCell>
+                    <TableCell>Swipe In</TableCell>
+                    <TableCell>Swipe Out</TableCell>
                     <TableCell>Hours</TableCell>
                     <TableCell>Description</TableCell>
                     <TableCell align="right">Actions</TableCell>
@@ -235,6 +287,20 @@ const WorkEntriesPage: React.FC = () => {
                           <Typography variant="body2">
                             {new Date(entry.date).toLocaleDateString()}
                           </Typography>
+                        </TableCell>
+                        <TableCell>
+                          {entry.swipe_in ? (
+                            <Typography variant="body2">{entry.swipe_in}</Typography>
+                          ) : (
+                            <Chip label="WFH" size="small" color="info" variant="outlined" />
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {entry.swipe_out ? (
+                            <Typography variant="body2">{entry.swipe_out}</Typography>
+                          ) : (
+                            <Chip label="WFH" size="small" color="info" variant="outlined" />
+                          )}
                         </TableCell>
                         <TableCell>
                           <Chip 
@@ -272,7 +338,7 @@ const WorkEntriesPage: React.FC = () => {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} align="center">
+                      <TableCell colSpan={7} align="center">
                         <Typography color="text.secondary" sx={{ py: 3 }}>
                           No work entries found. Add your first work entry to get started.
                         </Typography>
@@ -306,6 +372,96 @@ const WorkEntriesPage: React.FC = () => {
                 </Select>
               </FormControl>
 
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={formData.isWfh}
+                    onChange={(e) => {
+                      const isWfh = e.target.checked;
+                      const newData = { ...formData, isWfh };
+                      if (isWfh) {
+                        newData.swipeIn = '';
+                        newData.swipeOut = '';
+                      }
+                      setFormData(newData);
+                    }}
+                    disabled={createMutation.isPending || updateMutation.isPending}
+                  />
+                }
+                label="Work From Home (manual hours)"
+                sx={{ mt: 1, mb: 1 }}
+              />
+
+              {!formData.isWfh && (
+                <>
+                  <Box display="flex" gap={1} alignItems="center">
+                    <TextField
+                      margin="dense"
+                      label="Swipe In Time"
+                      placeholder="HH:MM"
+                      value={formData.swipeIn}
+                      onChange={(e) => {
+                        const newData = { ...formData, swipeIn: e.target.value };
+                        const calcHours = calculateHoursFromSwipe(e.target.value, formData.swipeInPeriod, formData.swipeOut, formData.swipeOutPeriod);
+                        if (calcHours) newData.hours = calcHours.toString();
+                        setFormData(newData);
+                      }}
+                      sx={{ flex: 1 }}
+                      inputProps={{ maxLength: 5 }}
+                      disabled={createMutation.isPending || updateMutation.isPending}
+                    />
+                    <FormControl sx={{ minWidth: 80 }} margin="dense">
+                      <Select
+                        value={formData.swipeInPeriod}
+                        onChange={(e) => {
+                          const newData = { ...formData, swipeInPeriod: e.target.value };
+                          const calcHours = calculateHoursFromSwipe(formData.swipeIn, e.target.value, formData.swipeOut, formData.swipeOutPeriod);
+                          if (calcHours) newData.hours = calcHours.toString();
+                          setFormData(newData);
+                        }}
+                        disabled={createMutation.isPending || updateMutation.isPending}
+                      >
+                        <MenuItem value="AM">AM</MenuItem>
+                        <MenuItem value="PM">PM</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Box>
+
+                  <Box display="flex" gap={1} alignItems="center">
+                    <TextField
+                      margin="dense"
+                      label="Swipe Out Time"
+                      placeholder="HH:MM"
+                      value={formData.swipeOut}
+                      onChange={(e) => {
+                        const newData = { ...formData, swipeOut: e.target.value };
+                        const calcHours = calculateHoursFromSwipe(formData.swipeIn, formData.swipeInPeriod, e.target.value, formData.swipeOutPeriod);
+                        if (calcHours) newData.hours = calcHours.toString();
+                        setFormData(newData);
+                      }}
+                      sx={{ flex: 1 }}
+                      inputProps={{ maxLength: 5 }}
+                      disabled={createMutation.isPending || updateMutation.isPending}
+                    />
+                    <FormControl sx={{ minWidth: 80 }} margin="dense">
+                      <Select
+                        value={formData.swipeOutPeriod}
+                        onChange={(e) => {
+                          const newData = { ...formData, swipeOutPeriod: e.target.value };
+                          const calcHours = calculateHoursFromSwipe(formData.swipeIn, formData.swipeInPeriod, formData.swipeOut, e.target.value);
+                          if (calcHours) newData.hours = calcHours.toString();
+                          setFormData(newData);
+                        }}
+                        disabled={createMutation.isPending || updateMutation.isPending}
+                      >
+                        <MenuItem value="AM">AM</MenuItem>
+                        <MenuItem value="PM">PM</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Box>
+                </>
+              )}
+
               <TextField
                 margin="dense"
                 label="Hours"
@@ -315,7 +471,7 @@ const WorkEntriesPage: React.FC = () => {
                 inputProps={{ min: 0.01, max: 24, step: 0.01 }}
                 value={formData.hours}
                 onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
-                disabled={createMutation.isPending || updateMutation.isPending}
+                disabled={createMutation.isPending || updateMutation.isPending || (!formData.isWfh && !!formData.swipeIn && !!formData.swipeOut)}
               />
 
               <DatePicker

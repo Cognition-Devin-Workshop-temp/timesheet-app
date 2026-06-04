@@ -98,12 +98,12 @@ class ApiClient {
     return response.data;
   }
 
-  async createWorkEntry(entryData: { clientId: number; hours: number; description?: string; date: string }) {
+  async createWorkEntry(entryData: { clientId: number; hours: number; description?: string; date: string; swipeIn?: string; swipeOut?: string }) {
     const response = await this.client.post('/api/work-entries', entryData);
     return response.data;
   }
 
-  async updateWorkEntry(id: number, entryData: { clientId?: number; hours?: number; description?: string; date?: string }) {
+  async updateWorkEntry(id: number, entryData: { clientId?: number; hours?: number; description?: string; date?: string; swipeIn?: string; swipeOut?: string }) {
     const response = await this.client.put(`/api/work-entries/${id}`, entryData);
     return response.data;
   }

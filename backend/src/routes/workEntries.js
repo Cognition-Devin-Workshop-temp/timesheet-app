@@ -15,6 +15,7 @@ router.get('/', (req, res) => {
   
   let query = `
     SELECT we.id, we.client_id, we.hours, we.description, we.date, 
+           we.swipe_in, we.swipe_out,
            we.created_at, we.updated_at, c.name as client_name
     FROM work_entries we
     JOIN clients c ON we.client_id = c.id
@@ -56,6 +57,7 @@ router.get('/:id', (req, res) => {
   
   db.get(
     `SELECT we.id, we.client_id, we.hours, we.description, we.date, 
+            we.swipe_in, we.swipe_out,
             we.created_at, we.updated_at, c.name as client_name
      FROM work_entries we
      JOIN clients c ON we.client_id = c.id
@@ -84,7 +86,7 @@ router.post('/', (req, res, next) => {
       return next(error);
     }
 
-    const { clientId, hours, description, date } = value;
+    const { clientId, hours, description, date, swipeIn, swipeOut } = value;
     const db = getDatabase();
 
     // Verify client exists and belongs to user
@@ -103,8 +105,8 @@ router.post('/', (req, res, next) => {
 
         // Create work entry
         db.run(
-          'INSERT INTO work_entries (client_id, user_email, hours, description, date) VALUES (?, ?, ?, ?, ?)',
-          [clientId, req.userEmail, hours, description || null, date],
+          'INSERT INTO work_entries (client_id, user_email, hours, description, date, swipe_in, swipe_out) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [clientId, req.userEmail, hours, description || null, date, swipeIn || null, swipeOut || null],
           function(err) {
             if (err) {
               console.error('Database error:', err);
@@ -114,6 +116,7 @@ router.post('/', (req, res, next) => {
             // Return the created work entry with client name
             db.get(
               `SELECT we.id, we.client_id, we.hours, we.description, we.date, 
+                      we.swipe_in, we.swipe_out,
                       we.created_at, we.updated_at, c.name as client_name
                FROM work_entries we
                JOIN clients c ON we.client_id = c.id
@@ -217,6 +220,16 @@ router.put('/:id', (req, res, next) => {
             values.push(value.date);
           }
 
+          if (value.swipeIn !== undefined) {
+            updates.push('swipe_in = ?');
+            values.push(value.swipeIn || null);
+          }
+
+          if (value.swipeOut !== undefined) {
+            updates.push('swipe_out = ?');
+            values.push(value.swipeOut || null);
+          }
+
           updates.push('updated_at = CURRENT_TIMESTAMP');
           values.push(workEntryId, req.userEmail);
 
@@ -231,6 +244,7 @@ router.put('/:id', (req, res, next) => {
             // Return updated work entry with client name
             db.get(
               `SELECT we.id, we.client_id, we.hours, we.description, we.date, 
+                      we.swipe_in, we.swipe_out,
                       we.created_at, we.updated_at, c.name as client_name
                FROM work_entries we
                JOIN clients c ON we.client_id = c.id
