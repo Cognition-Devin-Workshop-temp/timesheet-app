@@ -65,10 +65,35 @@ export class BasePage {
 
   /** Dismiss the Flipkart login popup that appears on first visit. */
   async dismissLoginPopup() {
-    const closeButton = this.page.locator('button:has-text("✕")');
-    if (await this.isVisible(closeButton, 3_000)) {
-      await closeButton.click();
+    const overlay = this.page.locator('div.mcO4kT, div[class*="_2Ki-L"], div[class*="JFOuB"]');
+    try {
+      await overlay.waitFor({ state: 'visible', timeout: 5_000 });
+    } catch {
+      return; // No popup appeared
     }
+
+    // Try multiple close button selectors
+    const closeSelectors = [
+      'button:has-text("✕")',
+      'button:has-text("×")',
+      'span:has-text("✕")',
+      'span:has-text("×")',
+      'button._2KpZ6l._2doB4z',
+      'div.mcO4kT button',
+    ];
+
+    for (const selector of closeSelectors) {
+      const btn = this.page.locator(selector).first();
+      if (await this.isVisible(btn, 1_000)) {
+        await btn.click({ force: true });
+        await overlay.waitFor({ state: 'hidden', timeout: 3_000 }).catch(() => {});
+        return;
+      }
+    }
+
+    // Fallback: press Escape to dismiss any modal
+    await this.page.keyboard.press('Escape');
+    await overlay.waitFor({ state: 'hidden', timeout: 3_000 }).catch(() => {});
   }
 
   // ── Assertions ─────────────────────────────────────────────

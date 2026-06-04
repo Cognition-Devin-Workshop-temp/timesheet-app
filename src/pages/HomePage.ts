@@ -33,7 +33,8 @@ export class HomePage extends BasePage {
 
   async searchFor(query: string) {
     await this.fill(this.searchInput, query);
-    await this.searchButton.click();
+    // Use Enter key instead of clicking the button to avoid overlay interception
+    await this.searchInput.press('Enter');
     await this.waitForPageLoad();
   }
 
