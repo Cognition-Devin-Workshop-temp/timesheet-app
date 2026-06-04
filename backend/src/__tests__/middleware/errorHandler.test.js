@@ -1,22 +1,31 @@
 const { errorHandler } = require('../../middleware/errorHandler');
 
+// Mock the logger
+jest.mock('../../observability/logger', () => ({
+  logger: {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    fatal: jest.fn(),
+  },
+}));
+
+const { logger } = require('../../observability/logger');
+
 describe('Error Handler Middleware', () => {
   let req, res, next;
 
   beforeEach(() => {
-    req = {};
+    req = { id: 'test-request-id' };
     res = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn()
     };
     next = jest.fn();
-    
-    // Mock console.error to avoid cluttering test output
-    jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    jest.clearAllMocks();
   });
 
   describe('Joi Validation Errors', () => {
@@ -55,11 +64,9 @@ describe('Error Handler Middleware', () => {
   });
 
   describe('SQLite Errors', () => {
-    test('should handle SQLITE_CONSTRAINT error', () => {
-      const sqliteError = {
-        code: 'SQLITE_CONSTRAINT',
-        message: 'UNIQUE constraint failed'
-      };
+    test('should handle SQLite errors', () => {
+      const sqliteError = new Error('SQLITE_CONSTRAINT: UNIQUE constraint failed');
+      sqliteError.code = 'SQLITE_CONSTRAINT';
 
       errorHandler(sqliteError, req, res, next);
 
@@ -70,11 +77,9 @@ describe('Error Handler Middleware', () => {
       });
     });
 
-    test('should handle SQLITE_ERROR', () => {
-      const sqliteError = {
-        code: 'SQLITE_ERROR',
-        message: 'SQL error'
-      };
+    test('should handle SQLITE_BUSY error', () => {
+      const sqliteError = new Error('Database is locked');
+      sqliteError.code = 'SQLITE_BUSY';
 
       errorHandler(sqliteError, req, res, next);
 
@@ -86,27 +91,23 @@ describe('Error Handler Middleware', () => {
     });
   });
 
-  describe('Generic Errors', () => {
-    test('should handle error with custom status', () => {
-      const customError = {
-        status: 403,
-        message: 'Forbidden access'
-      };
+  describe('Default Errors', () => {
+    test('should handle generic error with status', () => {
+      const error = new Error('Not found');
+      error.status = 404;
 
-      errorHandler(customError, req, res, next);
+      errorHandler(error, req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.status).toHaveBeenCalledWith(404);
       expect(res.json).toHaveBeenCalledWith({
-        error: 'Forbidden access'
+        error: 'Not found'
       });
     });
 
-    test('should default to 500 status if not specified', () => {
-      const genericError = {
-        message: 'Something went wrong'
-      };
+    test('should default to 500 for errors without status', () => {
+      const error = new Error('Something went wrong');
 
-      errorHandler(genericError, req, res, next);
+      errorHandler(error, req, res, next);
 
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.json).toHaveBeenCalledWith({
@@ -114,7 +115,7 @@ describe('Error Handler Middleware', () => {
       });
     });
 
-    test('should use default message if none provided', () => {
+    test('should default to "Internal server error" for errors without message', () => {
       const emptyError = {};
 
       errorHandler(emptyError, req, res, next);
@@ -126,13 +127,21 @@ describe('Error Handler Middleware', () => {
     });
   });
 
-  describe('Console Logging', () => {
-    test('should log error to console', () => {
+  describe('Structured Logging', () => {
+    test('should log error with request ID', () => {
       const error = new Error('Test error');
       
       errorHandler(error, req, res, next);
 
-      expect(console.error).toHaveBeenCalledWith('Error:', error);
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestId: 'test-request-id',
+          err: expect.objectContaining({
+            message: 'Test error',
+          }),
+        }),
+        expect.any(String)
+      );
     });
   });
 });
