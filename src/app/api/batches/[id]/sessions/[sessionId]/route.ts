@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { Session } from "@/models/Session";
 import { Attendee } from "@/models/Attendee";
+import { Mentor } from "@/models/Mentor";
 
 export async function GET(
   _request: Request,
@@ -28,7 +29,9 @@ export async function GET(
     }
   }
 
-  return NextResponse.json({ session, attendees, attendanceCounts });
+  const mentors = await Mentor.find({ batch_id: id }).sort({ created_at: 1 });
+
+  return NextResponse.json({ session, attendees, attendanceCounts, mentors });
 }
 
 export async function DELETE(

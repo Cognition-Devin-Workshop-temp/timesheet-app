@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/mongodb";
 import { Batch } from "@/models/Batch";
 import { Attendee } from "@/models/Attendee";
 import { Session } from "@/models/Session";
+import { Mentor } from "@/models/Mentor";
 
 export async function GET(
   _request: Request,
@@ -20,8 +21,9 @@ export async function GET(
   const sessions = await Session.find({ batch_id: id }).sort({
     session_date: -1,
   });
+  const mentors = await Mentor.find({ batch_id: id }).sort({ created_at: 1 });
 
-  return NextResponse.json({ batch, attendees, sessions });
+  return NextResponse.json({ batch, attendees, sessions, mentors });
 }
 
 export async function DELETE(
@@ -33,6 +35,7 @@ export async function DELETE(
 
   await Attendee.deleteMany({ batch_id: id });
   await Session.deleteMany({ batch_id: id });
+  await Mentor.deleteMany({ batch_id: id });
   await Batch.findByIdAndDelete(id);
 
   return NextResponse.json({ success: true });

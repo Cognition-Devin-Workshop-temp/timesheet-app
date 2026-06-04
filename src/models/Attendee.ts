@@ -7,6 +7,7 @@ export interface IComment {
 
 export interface IAttendee extends Document {
   batch_id: Types.ObjectId;
+  mentor_id?: Types.ObjectId;
   name: string;
   amount_paid: number;
   phone_number: string;
@@ -23,6 +24,7 @@ const CommentSchema = new Schema<IComment>({
 
 const AttendeeSchema = new Schema<IAttendee>({
   batch_id: { type: Schema.Types.ObjectId, ref: "Batch", required: true },
+  mentor_id: { type: Schema.Types.ObjectId, ref: "Mentor" },
   name: { type: String, required: true },
   amount_paid: { type: Number, required: true },
   phone_number: { type: String, required: true },

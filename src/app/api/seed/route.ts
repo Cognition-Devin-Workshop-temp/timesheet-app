@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/mongodb";
 import { Batch } from "@/models/Batch";
 import { Attendee } from "@/models/Attendee";
 import { Session } from "@/models/Session";
+import { Mentor } from "@/models/Mentor";
 
 export async function POST() {
   try {
@@ -54,8 +55,23 @@ export async function POST() {
       },
     ];
 
+    // Create mentors
+    const mentorsData = [
+      { name: "Swami Vivekananda Ji", phone_number: "+919800000001", email: "swami@example.com" },
+      { name: "Guru Priya Ma", phone_number: "+919800000002", email: "priya.guru@example.com" },
+    ];
+
+    const mentors = await Mentor.insertMany(
+      mentorsData.map((m) => ({ ...m, batch_id: batch._id }))
+    );
+
+    // Auto-assign attendees equally among mentors
     const attendees = await Attendee.insertMany(
-      attendeesData.map((a) => ({ ...a, batch_id: batch._id }))
+      attendeesData.map((a, i) => ({
+        ...a,
+        batch_id: batch._id,
+        mentor_id: mentors[i % mentors.length]._id,
+      }))
     );
 
     await Session.create({

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { Attendee } from "@/models/Attendee";
+import { Mentor } from "@/models/Mentor";
 
 export async function GET(
   _request: Request,
@@ -28,8 +29,31 @@ export async function POST(
       );
     }
 
+    // Find mentor with fewest attendees for auto-assignment
+    const mentors = await Mentor.find({ batch_id: id }).sort({ created_at: 1 });
+    let assignedMentorId = undefined;
+    if (mentors.length > 0) {
+      const counts = await Attendee.aggregate([
+        { $match: { batch_id: (await import("mongoose")).Types.ObjectId.createFromHexString(id), mentor_id: { $exists: true } } },
+        { $group: { _id: "$mentor_id", count: { $sum: 1 } } },
+      ]);
+      const countMap: Record<string, number> = {};
+      for (const c of counts) {
+        countMap[c._id.toString()] = c.count;
+      }
+      let minCount = Infinity;
+      for (const m of mentors) {
+        const cnt = countMap[m._id.toString()] || 0;
+        if (cnt < minCount) {
+          minCount = cnt;
+          assignedMentorId = m._id;
+        }
+      }
+    }
+
     const attendee = await Attendee.create({
       batch_id: id,
+      mentor_id: assignedMentorId,
       name: body.name,
       amount_paid: body.amount_paid,
       phone_number: body.phone_number,
