@@ -19,6 +19,7 @@ export default defineConfig([
     },
     rules: {
       'react-hooks/purity': 'off',
+      'react-hooks/refs': 'off',
     },
   },
 ])
