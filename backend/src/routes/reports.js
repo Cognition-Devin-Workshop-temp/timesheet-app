@@ -23,12 +23,12 @@ router.get('/dashboard', (req, res) => {
 
   const sql = `
     SELECT c.name as client_name,
-           strftime('${strftimeFmt}', we.date) as period,
+           strftime('${strftimeFmt}', we.date / 1000, 'unixepoch') as period,
            SUM(we.hours) as total_hours
     FROM work_entries we
     JOIN clients c ON we.client_id = c.id
     WHERE we.user_email = ?
-      AND we.date >= date('now', '-' || ? || ' days')
+      AND we.date >= CAST(strftime('%s', date('now', '-' || ? || ' days')) AS INTEGER) * 1000
     GROUP BY c.name, period
     ORDER BY period ASC
   `;
