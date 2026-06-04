@@ -174,12 +174,18 @@ describe('Project Routes', () => {
       const newProject = { name: 'Full Project', description: 'A project', clientId: 1, startDate: '2024-06-01', status: 'on-hold' };
       const createdProject = { id: 1, name: 'Full Project', description: 'A project', client_id: 1, client_name: 'Client A', start_date: '2024-06-01', status: 'on-hold', created_at: '2024-01-01', updated_at: '2024-01-01' };
 
+      // First get: verify client exists
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
       mockDb.run.mockImplementation(function(query, params, callback) {
         this.lastID = 1;
         callback.call(this, null);
       });
 
-      mockDb.get.mockImplementation((query, params, callback) => {
+      // Second get: retrieve created project
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
         callback(null, createdProject);
       });
 
@@ -189,6 +195,32 @@ describe('Project Routes', () => {
 
       expect(response.status).toBe(201);
       expect(response.body.project.status).toBe('on-hold');
+    });
+
+    test('should return 400 if client not found when creating', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, null);
+      });
+
+      const response = await request(app)
+        .post('/api/projects')
+        .send({ name: 'Test Project', clientId: 999 });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Client not found or does not belong to user' });
+    });
+
+    test('should handle database error when verifying client', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(new Error('Database error'), null);
+      });
+
+      const response = await request(app)
+        .post('/api/projects')
+        .send({ name: 'Test Project', clientId: 1 });
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Internal server error' });
     });
 
     test('should return 400 for missing name', async () => {
@@ -386,6 +418,44 @@ describe('Project Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.project).toEqual(updatedProject);
+    });
+
+    test('should return 400 if new client not found', async () => {
+      // First get: project exists
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      // Second get: client not found
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, null);
+      });
+
+      const response = await request(app)
+        .put('/api/projects/1')
+        .send({ clientId: 999 });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Client not found or does not belong to user' });
+    });
+
+    test('should handle database error when verifying new client in update', async () => {
+      // First get: project exists
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      // Second get: database error
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(new Error('Database error'), null);
+      });
+
+      const response = await request(app)
+        .put('/api/projects/1')
+        .send({ clientId: 1 });
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Internal server error' });
     });
   });
 
