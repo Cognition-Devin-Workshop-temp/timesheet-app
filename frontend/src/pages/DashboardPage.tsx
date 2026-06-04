@@ -18,6 +18,15 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
 
+function parseLocalDate(dateValue: string | number): Date {
+  if (typeof dateValue === 'number') {
+    const d = new Date(dateValue);
+    return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  }
+  const [year, month, day] = dateValue.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
 
@@ -129,7 +138,7 @@ const DashboardPage: React.FC = () => {
                 <Box key={entry.id} sx={{ mb: 2, pb: 2, borderBottom: '1px solid #eee' }}>
                   <Typography variant="subtitle1">{entry.client_name}</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {entry.hours} hours - {new Date(entry.date).toLocaleDateString()}
+                    {entry.hours} hours - {parseLocalDate(entry.date).toLocaleDateString()}
                   </Typography>
                   {entry.description && (
                     <Typography variant="body2" sx={{ mt: 1 }}>

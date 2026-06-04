@@ -36,6 +36,22 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import apiClient from '../api/client';
 import { type WorkEntry } from '../types/api';
 
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseLocalDate(dateValue: string | number): Date {
+  if (typeof dateValue === 'number') {
+    const d = new Date(dateValue);
+    return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  }
+  const [year, month, day] = dateValue.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
 const WorkEntriesPage: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<WorkEntry | null>(null);
@@ -106,7 +122,7 @@ const WorkEntriesPage: React.FC = () => {
         clientId: entry.client_id,
         hours: entry.hours.toString(),
         description: entry.description || '',
-        date: new Date(entry.date),
+        date: parseLocalDate(entry.date),
       });
     } else {
       setEditingEntry(null);
@@ -157,7 +173,7 @@ const WorkEntriesPage: React.FC = () => {
       clientId: formData.clientId,
       hours,
       description: formData.description || undefined,
-      date: formData.date.toISOString().split('T')[0],
+      date: formatLocalDate(formData.date),
     };
 
     if (editingEntry) {
@@ -233,7 +249,7 @@ const WorkEntriesPage: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">
-                            {new Date(entry.date).toLocaleDateString()}
+                            {parseLocalDate(entry.date).toLocaleDateString()}
                           </Typography>
                         </TableCell>
                         <TableCell>

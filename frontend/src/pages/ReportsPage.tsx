@@ -31,6 +31,22 @@ import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import { type ClientReport } from '../types/api';
 
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseLocalDate(dateValue: string | number): Date {
+  if (typeof dateValue === 'number') {
+    const d = new Date(dateValue);
+    return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  }
+  const [year, month, day] = dateValue.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
 const ReportsPage: React.FC = () => {
   const [selectedClientId, setSelectedClientId] = useState<number>(0);
   const [error, setError] = useState('');
@@ -58,7 +74,7 @@ const ReportsPage: React.FC = () => {
       const a = document.createElement('a');
       a.href = url;
       const client = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
-      a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${formatLocalDate(new Date())}.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -78,7 +94,7 @@ const ReportsPage: React.FC = () => {
       const a = document.createElement('a');
       a.href = url;
       const client = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
-      a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${new Date().toISOString().split('T')[0]}.pdf`;
+      a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${formatLocalDate(new Date())}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -232,7 +248,7 @@ const ReportsPage: React.FC = () => {
                           <TableRow key={entry.id}>
                             <TableCell>
                               <Typography variant="body2">
-                                {new Date(entry.date).toLocaleDateString()}
+                                {parseLocalDate(entry.date).toLocaleDateString()}
                               </Typography>
                             </TableCell>
                             <TableCell>
