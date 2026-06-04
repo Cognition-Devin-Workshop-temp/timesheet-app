@@ -34,7 +34,7 @@ const projectSchema = Joi.object({
   status: Joi.string().trim().valid('active', 'completed', 'on_hold', 'cancelled').optional(),
   clientId: Joi.number().integer().positive().optional().allow(null),
   startDate: Joi.date().iso().optional().allow(null, ''),
-  endDate: Joi.date().iso().optional().allow(null, '')
+  endDate: Joi.date().iso().min(Joi.ref('startDate')).optional().allow(null, '')
 });
 
 const updateProjectSchema = Joi.object({
@@ -43,7 +43,7 @@ const updateProjectSchema = Joi.object({
   status: Joi.string().trim().valid('active', 'completed', 'on_hold', 'cancelled').optional(),
   clientId: Joi.number().integer().positive().optional().allow(null),
   startDate: Joi.date().iso().optional().allow(null, ''),
-  endDate: Joi.date().iso().optional().allow(null, '')
+  endDate: Joi.date().iso().min(Joi.ref('startDate')).optional().allow(null, '')
 }).min(1);
 
 const emailSchema = Joi.object({
