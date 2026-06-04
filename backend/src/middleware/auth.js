@@ -17,7 +17,7 @@ function authenticateUser(req, res, next) {
   const db = getDatabase();
   
   // Check if user exists, create if not
-  db.get('SELECT email FROM users WHERE email = ?', [userEmail], (err, row) => {
+  db.get('SELECT email, role, team_id FROM users WHERE email = ?', [userEmail], (err, row) => {
     if (err) {
       console.error('Database error:', err);
       return res.status(500).json({ error: 'Internal server error' });
@@ -32,15 +32,40 @@ function authenticateUser(req, res, next) {
         }
         
         req.userEmail = userEmail;
+        req.userRole = 'member';
+        req.teamId = null;
         next();
       });
     } else {
       req.userEmail = userEmail;
+      req.userRole = row.role;
+      req.teamId = row.team_id;
       next();
     }
   });
 }
 
+function requireManager(req, res, next) {
+  const db = getDatabase();
+  db.get(
+    'SELECT role, team_id FROM users WHERE email = ?',
+    [req.userEmail],
+    (err, row) => {
+      if (err) return res.status(500).json({ error: 'Internal server error' });
+      if (!row || row.role !== 'manager') {
+        return res.status(403).json({ error: 'Manager access required' });
+      }
+      if (!row.team_id) {
+        return res.status(403).json({ error: 'Manager must belong to a team' });
+      }
+      req.userRole = 'manager';
+      req.teamId = row.team_id;
+      next();
+    }
+  );
+}
+
 module.exports = {
-  authenticateUser
+  authenticateUser,
+  requireManager
 };

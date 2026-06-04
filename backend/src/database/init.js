@@ -27,10 +27,24 @@ async function initializeDatabase() {
   
   return new Promise((resolve, reject) => {
     database.serialize(() => {
+      // Create teams table
+      database.run(`
+        CREATE TABLE IF NOT EXISTS teams (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
       // Create users table
       database.run(`
         CREATE TABLE IF NOT EXISTS users (
           email TEXT PRIMARY KEY,
+          display_name TEXT,
+          role TEXT DEFAULT 'member' CHECK(role IN ('manager','member')),
+          team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL,
+          weekly_capacity DECIMAL(5,2) DEFAULT 40.00,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
       `);
@@ -71,6 +85,8 @@ async function initializeDatabase() {
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_users_team_id ON users (team_id)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date_user ON work_entries (date, user_email)`);
 
       console.log('Database tables created successfully');
       resolve();
