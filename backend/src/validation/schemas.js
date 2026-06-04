@@ -28,6 +28,30 @@ const updateClientSchema = Joi.object({
   email: Joi.string().trim().email().max(255).optional().allow('')
 }).min(1); // At least one field must be provided
 
+const projectSchema = Joi.object({
+  name: Joi.string().trim().min(1).max(255).required(),
+  description: Joi.string().trim().max(1000).optional().allow(''),
+  status: Joi.string().trim().valid('active', 'completed', 'on_hold', 'cancelled').optional(),
+  clientId: Joi.number().integer().positive().optional().allow(null),
+  startDate: Joi.date().iso().optional().allow(null, ''),
+  endDate: Joi.date().iso().optional().allow(null, '').when('startDate', {
+    is: Joi.date().iso().required(),
+    then: Joi.date().iso().min(Joi.ref('startDate'))
+  })
+});
+
+const updateProjectSchema = Joi.object({
+  name: Joi.string().trim().min(1).max(255).optional(),
+  description: Joi.string().trim().max(1000).optional().allow(''),
+  status: Joi.string().trim().valid('active', 'completed', 'on_hold', 'cancelled').optional(),
+  clientId: Joi.number().integer().positive().optional().allow(null),
+  startDate: Joi.date().iso().optional().allow(null, ''),
+  endDate: Joi.date().iso().optional().allow(null, '').when('startDate', {
+    is: Joi.date().iso().required(),
+    then: Joi.date().iso().min(Joi.ref('startDate'))
+  })
+}).min(1);
+
 const emailSchema = Joi.object({
   email: Joi.string().email().required()
 });
@@ -37,5 +61,7 @@ module.exports = {
   workEntrySchema,
   updateWorkEntrySchema,
   updateClientSchema,
+  projectSchema,
+  updateProjectSchema,
   emailSchema
 };
