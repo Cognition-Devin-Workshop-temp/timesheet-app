@@ -18,8 +18,12 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
 
-function parseLocalDate(dateStr: string): Date {
-  const [year, month, day] = dateStr.split('-').map(Number);
+function parseLocalDate(dateValue: string | number): Date {
+  if (typeof dateValue === 'number') {
+    const d = new Date(dateValue);
+    return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  }
+  const [year, month, day] = dateValue.split('-').map(Number);
   return new Date(year, month - 1, day);
 }
 
