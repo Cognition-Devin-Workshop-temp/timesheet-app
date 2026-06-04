@@ -160,7 +160,7 @@ describe('Auth Routes', () => {
       const response = await request(app).get('/api/auth/me');
 
       expect(response.status).toBe(401);
-      expect(response.body).toEqual({ error: 'User email required in x-user-email header' });
+      expect(response.body).toEqual({ error: 'Authentication required' });
     });
 
     test('should return 404 if user not found', async () => {

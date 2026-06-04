@@ -34,7 +34,7 @@ describe('Authentication Middleware', () => {
 
       expect(res.status).toHaveBeenCalledWith(401);
       expect(res.json).toHaveBeenCalledWith({
-        error: 'User email required in x-user-email header'
+        error: 'Authentication required'
       });
       expect(next).not.toHaveBeenCalled();
     });

@@ -16,9 +16,14 @@ class ApiClient {
       },
     });
 
-    // Request interceptor to add email header
+    // Request interceptor to add auth headers
     this.client.interceptors.request.use(
       (config) => {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          config.headers['Authorization'] = `Bearer ${token}`;
+        }
+        // Keep x-user-email as fallback for backward compatibility
         const userEmail = localStorage.getItem('userEmail');
         if (userEmail) {
           config.headers['x-user-email'] = userEmail;
@@ -35,8 +40,8 @@ class ApiClient {
       (response: AxiosResponse) => response,
       (error) => {
         if (error.response?.status === 401) {
-          // Clear stored email on auth error
           localStorage.removeItem('userEmail');
+          localStorage.removeItem('authToken');
           window.location.href = '/login';
         }
         return Promise.reject(error);
