@@ -3,9 +3,9 @@
 **Application:** Timesheet App (React + Node.js/Express)  
 **Test Framework:** Playwright (Chromium)  
 **Test Runner:** `npx playwright test --reporter=list`  
-**Total Tests:** 16  
+**Total Tests:** 18  
 **Status:** All Passing  
-**Last Run:** June 2026 — 42.6s total execution time  
+**Last Run:** June 2026 — 50.3s total execution time  
 
 ---
 
@@ -18,7 +18,8 @@
 | Work Entries CRUD  | `work-entries.spec.ts`       | 3     | 3      | 0      |
 | Reports            | `reports.spec.ts`            | 1     | 1      | 0      |
 | Edge Cases         | `edge-cases.spec.ts`         | 6     | 6      | 0      |
-| **Total**          |                              | **16**| **16** | **0**  |
+| CSV & PDF Export   | `exports.spec.ts`            | 2     | 2      | 0      |
+| **Total**          |                              | **18**| **18** | **0**  |
 
 ---
 
@@ -111,6 +112,21 @@ HTML report: `npx playwright show-report` (generated in `e2e/playwright-report/`
 
 ---
 
+### 6. CSV & PDF Export (`exports.spec.ts`)
+
+| # | Test Name | What It Covers | Pages | API Endpoints | Assertions |
+|---|-----------|---------------|-------|---------------|------------|
+| 17 | Download CSV and validate content | CSV file download via UI + content validation via API | `/reports` | `GET /api/reports/export/csv/:clientId` | - "Export as CSV" button triggers download<br>- Filename contains `.csv`<br>- CSV header contains Date, Hours, Description<br>- 3+ lines (header + 2 data rows)<br>- Data rows contain hours (3, 5) and descriptions ("Design review", "Implementation") |
+| 18 | Download PDF and validate content | PDF file download via UI + parsed text validation | `/reports` | `GET /api/reports/export/pdf/:clientId` | - "Export as PDF" button triggers download<br>- Filename contains `.pdf`<br>- PDF starts with `%PDF-` magic bytes<br>- File size > 500 bytes<br>- PDF ends with `%%EOF` marker<br>- Parsed text contains client name, "Total Hours", "8.00", entry descriptions |
+
+**Frontend components covered:** `ReportsPage.tsx` (export icon buttons, blob download logic)  
+**Backend routes covered:** `GET /api/reports/export/csv/:clientId`, `GET /api/reports/export/pdf/:clientId`  
+**Validation approach:** UI download event (filename, trigger) + direct API call (content validation)  
+**Dependencies:** `pdf-parse` (dev) for PDF text extraction  
+**Prerequisite:** Each test creates 1 client + 2 work entries (3h "Design review" + 5h "Implementation")
+
+---
+
 ## Page Coverage Matrix
 
 | Page               | Component File              | Covered By                                  |
@@ -119,7 +135,7 @@ HTML report: `npx playwright show-report` (generated in `e2e/playwright-report/`
 | Dashboard          | `DashboardPage.tsx`         | Visited via login redirect (all suites)      |
 | Clients            | `ClientsPage.tsx`           | `clients.spec.ts` (3) + `edge-cases.spec.ts` (3) |
 | Work Entries       | `WorkEntriesPage.tsx`       | `work-entries.spec.ts` (3) + `edge-cases.spec.ts` (3) |
-| Reports            | `ReportsPage.tsx`           | `reports.spec.ts` (1)                        |
+| Reports            | `ReportsPage.tsx`           | `reports.spec.ts` (1) + `exports.spec.ts` (2) |
 | Layout / Nav       | `Layout.tsx`                | Navigation used in all test suites           |
 
 ---
@@ -139,8 +155,8 @@ HTML report: `npx playwright show-report` (generated in `e2e/playwright-report/`
 | `PUT`    | `/api/work-entries/:id`           | `work-entries.spec.ts`            | Hours update |
 | `DELETE` | `/api/work-entries/:id`           | `work-entries.spec.ts`            | Confirm dialog |
 | `GET`    | `/api/reports/client/:clientId`   | `reports.spec.ts`                 | Aggregation accuracy |
-| `GET`    | `/api/reports/export/csv/:id`     | Not covered                       | — |
-| `GET`    | `/api/reports/export/pdf/:id`     | Not covered                       | — |
+| `GET`    | `/api/reports/export/csv/:id`     | `exports.spec.ts`                 | Content headers, data rows, hours, descriptions |
+| `GET`    | `/api/reports/export/pdf/:id`     | `exports.spec.ts`                 | Magic bytes, text extraction, hours, descriptions |
 
 ---
 
@@ -158,8 +174,10 @@ HTML report: `npx playwright show-report` (generated in `e2e/playwright-report/`
 | MUI IconButton      | Edit (EditIcon), Delete (DeleteIcon) per row         |
 | MUI Chip            | Hours display (e.g., "4 hours")                      |
 | MUI Card            | Report metric cards (Total Hours, Total Entries)     |
+| MUI Tooltip/IconButton | "Export as CSV" and "Export as PDF" download buttons  |
 | Navigation          | Sidebar menu items, AppBar with user email           |
 | Browser dialog      | `window.confirm()` for delete operations             |
+| File downloads      | Browser download events for CSV and PDF files         |
 
 ---
 
@@ -168,8 +186,8 @@ HTML report: `npx playwright show-report` (generated in `e2e/playwright-report/`
 | Helper Function     | Description                                          | Used By |
 |---------------------|------------------------------------------------------|---------|
 | `login(page, email)` | Navigates to `/login`, fills email, submits, waits for `/dashboard` | All test suites (beforeEach) |
-| `createClient(page, name, opts)` | Creates a client via UI with optional department/email/description | `work-entries.spec.ts`, `reports.spec.ts`, `edge-cases.spec.ts` |
-| `selectClient(page, clientName)` | Opens MUI combobox in dialog and selects a client by name | `work-entries.spec.ts`, `reports.spec.ts`, `edge-cases.spec.ts` |
+| `createClient(page, name, opts)` | Creates a client via UI with optional department/email/description | `work-entries.spec.ts`, `reports.spec.ts`, `edge-cases.spec.ts`, `exports.spec.ts` |
+| `selectClient(page, clientName)` | Opens MUI combobox in dialog and selects a client by name | `work-entries.spec.ts`, `reports.spec.ts`, `edge-cases.spec.ts`, `exports.spec.ts` |
 | `uniqueName(prefix)` | Generates unique names with timestamp + random suffix | All test suites |
 | `deleteAllClients(page)` | Bulk delete utility (available but not actively used) | — |
 
@@ -179,7 +197,7 @@ HTML report: `npx playwright show-report` (generated in `e2e/playwright-report/`
 
 | Area                              | Reason                                                |
 |-----------------------------------|-------------------------------------------------------|
-| CSV/PDF export endpoints          | Requires file download validation; browser blob handling |
+
 | Dashboard page content            | Page is visited (login redirect) but no specific widget assertions |
 | Multiple user isolation           | All tests use single user `test@example.com`          |
 | Concurrent session testing        | Single-browser, sequential execution                  |
