@@ -40,7 +40,7 @@ import { type Project } from '../types/api';
 const ProjectsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [formData, setFormData] = useState({ name: '', description: '', clientId: 0, startDate: new Date(), status: 'active' });
+  const [formData, setFormData] = useState<{ name: string; description: string; clientId: number; startDate: Date | null; status: string }>({ name: '', description: '', clientId: 0, startDate: null, status: 'active' });
   const [error, setError] = useState('');
 
   const queryClient = useQueryClient();
@@ -113,12 +113,12 @@ const ProjectsPage: React.FC = () => {
         name: project.name,
         description: project.description || '',
         clientId: project.client_id || 0,
-        startDate: project.start_date ? new Date(project.start_date) : new Date(),
+        startDate: project.start_date ? new Date(project.start_date) : null,
         status: project.status,
       });
     } else {
       setEditingProject(null);
-      setFormData({ name: '', description: '', clientId: 0, startDate: new Date(), status: 'active' });
+      setFormData({ name: '', description: '', clientId: 0, startDate: null, status: 'active' });
     }
     setError('');
     setOpen(true);
@@ -127,7 +127,7 @@ const ProjectsPage: React.FC = () => {
   const handleClose = () => {
     setOpen(false);
     setEditingProject(null);
-    setFormData({ name: '', description: '', clientId: 0, startDate: new Date(), status: 'active' });
+    setFormData({ name: '', description: '', clientId: 0, startDate: null, status: 'active' });
     setError('');
   };
 
@@ -344,8 +344,8 @@ const ProjectsPage: React.FC = () => {
                 <DatePicker
                   label="Start Date"
                   value={formData.startDate}
-                  onChange={(newValue) => setFormData({ ...formData, startDate: newValue || new Date() })}
-                  slotProps={{ textField: { fullWidth: true, margin: 'dense' } }}
+                  onChange={(newValue) => setFormData({ ...formData, startDate: newValue })}
+                  slotProps={{ textField: { fullWidth: true, margin: 'dense' }, field: { clearable: true } }}
                   disabled={createMutation.isPending || updateMutation.isPending}
                 />
               </Box>
