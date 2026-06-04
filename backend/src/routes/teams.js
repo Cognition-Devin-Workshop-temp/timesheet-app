@@ -509,10 +509,6 @@ router.get('/:teamId/workload/breakdown', requireTeamAccess, (req, res, next) =>
             return res.status(404).json({ error: 'Team not found' });
           }
 
-          if (!team) {
-            return res.status(404).json({ error: 'Team not found' });
-          }
-
           res.json({
             team: { id: team.id, name: team.name },
             period: { startDate: startStr, endDate: endStr },
