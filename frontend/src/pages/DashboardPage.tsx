@@ -7,6 +7,13 @@ import {
   Box,
   Button,
   Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  CircularProgress,
 } from '@mui/material';
 import {
   Business as BusinessIcon,
@@ -31,11 +38,24 @@ const DashboardPage: React.FC = () => {
     queryFn: () => apiClient.getWorkEntries(),
   });
 
+  const { data: dashboardData, isLoading: isDashboardLoading } = useQuery({
+    queryKey: ['dashboardSummary'],
+    queryFn: () => apiClient.getDashboardSummary(),
+  });
+
   const clients = clientsData?.clients || [];
   const workEntries = workEntriesData?.workEntries || [];
 
   const totalHours = workEntries.reduce((sum: number, entry: { hours: number }) => sum + entry.hours, 0);
   const recentEntries = workEntries.slice(0, 5);
+  const weeklySummary = dashboardData?.weeks || [];
+
+  const formatWeekRange = (weekStart: string, weekEnd: string) => {
+    const start = new Date(weekStart + 'T00:00:00');
+    const end = new Date(weekEnd + 'T00:00:00');
+    const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+    return `${start.toLocaleDateString('en-US', options)} – ${end.toLocaleDateString('en-US', options)}`;
+  };
 
   const statsCards = [
     {
@@ -108,6 +128,68 @@ const DashboardPage: React.FC = () => {
           </Grid>
         ))}
       </Grid>
+
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6" mb={2}>
+          Hours – Last 3 Weeks
+        </Typography>
+        {isDashboardLoading ? (
+          <Box display="flex" justifyContent="center" py={3}>
+            <CircularProgress />
+          </Box>
+        ) : weeklySummary.length === 0 ||
+          weeklySummary.every(
+            (w: { total_hours: number }) => w.total_hours === 0
+          ) ? (
+          <Typography color="text.secondary">
+            No hours logged in the last 3 weeks
+          </Typography>
+        ) : (
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Week</TableCell>
+                  <TableCell align="right">Total Hours</TableCell>
+                  <TableCell>Breakdown by Client</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {weeklySummary.map(
+                  (
+                    week: {
+                      week_start: string;
+                      week_end: string;
+                      total_hours: number;
+                      entries: { client_name: string; hours: number }[];
+                    },
+                    idx: number
+                  ) => (
+                    <TableRow key={idx}>
+                      <TableCell>
+                        {formatWeekRange(week.week_start, week.week_end)}
+                      </TableCell>
+                      <TableCell align="right">
+                        {week.total_hours.toFixed(2)}
+                      </TableCell>
+                      <TableCell>
+                        {week.entries.length > 0
+                          ? week.entries
+                              .map(
+                                (e: { client_name: string; hours: number }) =>
+                                  `${e.client_name} (${e.hours.toFixed(2)}h)`
+                              )
+                              .join(', ')
+                          : '—'}
+                      </TableCell>
+                    </TableRow>
+                  )
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </Paper>
 
       <Grid container spacing={3}>
         {/* @ts-expect-error - MUI Grid item prop type issue */}

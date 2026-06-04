@@ -244,4 +244,81 @@ router.get('/export/pdf/:clientId', (req, res) => {
   );
 });
 
+// Get dashboard summary: hours aggregated by week for the last 3 weeks
+router.get('/dashboard', (req, res) => {
+  const db = getDatabase();
+
+  db.all(
+    `SELECT we.hours, we.date, c.name as client_name
+     FROM work_entries we
+     JOIN clients c ON we.client_id = c.id
+     WHERE we.user_email = ? AND we.date >= date('now', '-21 days')
+     ORDER BY we.date DESC`,
+    [req.userEmail],
+    (err, rows) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      const now = new Date();
+      const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, ...
+      // Offset to get back to Monday of the current week
+      const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+
+      const weeks = [];
+      for (let i = 0; i < 3; i++) {
+        const weekStart = new Date(now);
+        weekStart.setHours(0, 0, 0, 0);
+        weekStart.setDate(now.getDate() - mondayOffset - i * 7);
+
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        weekEnd.setHours(23, 59, 59, 999);
+
+        weeks.push({
+          week_start: weekStart.toISOString().split('T')[0],
+          week_end: weekEnd.toISOString().split('T')[0],
+          total_hours: 0,
+          entries: [],
+          _byClient: {},
+        });
+      }
+
+      (rows || []).forEach((row) => {
+        const entryDate = new Date(row.date + 'T00:00:00');
+        for (const week of weeks) {
+          const ws = new Date(week.week_start + 'T00:00:00');
+          const we = new Date(week.week_end + 'T23:59:59');
+          if (entryDate >= ws && entryDate <= we) {
+            const hours = parseFloat(row.hours);
+            week.total_hours += hours;
+            if (week._byClient[row.client_name]) {
+              week._byClient[row.client_name] += hours;
+            } else {
+              week._byClient[row.client_name] = hours;
+            }
+            break;
+          }
+        }
+      });
+
+      const weeklySummary = weeks.map((week) => {
+        const entries = Object.entries(week._byClient).map(([client_name, hours]) => ({
+          client_name,
+          hours,
+        }));
+        return {
+          week_start: week.week_start,
+          week_end: week.week_end,
+          total_hours: week.total_hours,
+          entries,
+        };
+      });
+
+      res.json({ weeks: weeklySummary });
+    }
+  );
+});
+
 module.exports = router;

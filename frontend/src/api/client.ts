@@ -114,6 +114,11 @@ class ApiClient {
   }
 
   // Report endpoints
+  async getDashboardSummary() {
+    const response = await this.client.get('/api/reports/dashboard');
+    return response.data;
+  }
+
   async getClientReport(clientId: number) {
     const response = await this.client.get(`/api/reports/client/${clientId}`);
     return response.data;
