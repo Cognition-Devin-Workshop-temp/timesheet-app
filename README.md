@@ -11,14 +11,14 @@ A full-stack web application for tracking and reporting employee hourly work acr
 - For production use, modify `backend/src/database/init.js` to use file-based SQLite instead of `:memory:`
 
 ### Authentication
-- Email-only authentication with JWT tokens
-- No password required - assumes trusted internal network
-- Anyone with a valid email can create an account and log in
+- Password-based authentication with bcrypt hashing and JWT tokens
+- Users must register with an email and password (min 8 characters)
+- JWT tokens expire after 24 hours
 - Consider integrating with company SSO for production use
 
 ## Features
 
-- ✅ User authentication (email-based with JWT tokens)
+- ✅ User authentication (password-based with bcrypt + JWT tokens)
 - ✅ Add, edit, and delete clients
 - ✅ Add, edit, and delete hourly work entries for each client
 - ✅ View hourly reports for each client
@@ -154,14 +154,16 @@ Frontend will be running at `http://localhost:5173`
 ## Usage
 
 1. Open `http://localhost:5173` in your browser
-2. Enter any email address to log in (no password required)
-3. Start adding clients and tracking work hours
-4. View reports and export data as CSV or PDF
+2. Register with an email address and password (min 8 characters)
+3. Log in with your credentials
+4. Start adding clients and tracking work hours
+5. View reports and export data as CSV or PDF
 
 ## API Endpoints
 
 ### Authentication
-- `POST /api/auth/login` - Login with email, returns JWT token
+- `POST /api/auth/register` - Register with `{ email, password }`, returns JWT token
+- `POST /api/auth/login` - Login with `{ email, password }`, returns JWT token
 - `GET /api/auth/me` - Get current user info (requires auth)
 
 ### Clients
@@ -272,7 +274,7 @@ See `backend/DEPLOYMENT.md` for detailed production deployment instructions.
 ## Known Limitations
 
 1. **In-memory database** - All data is lost on server restart
-2. **Email-only auth** - No password protection, assumes trusted network
+2. **Default JWT secret** - Change `JWT_SECRET` in production
 3. **No user roles** - All users have equal access to all data
 4. **Single-server architecture** - Not designed for horizontal scaling
 5. **No real-time updates** - Changes require page refresh
