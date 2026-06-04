@@ -14,6 +14,8 @@ export class CartPage extends BasePage {
   readonly totalAmount: Locator;
   readonly placeOrderButton: Locator;
   readonly cartCount: Locator;
+  readonly quantityLimitMessage: Locator;
+  readonly quantityInput: Locator;
 
   constructor(page: Page) {
     super(page);
@@ -27,6 +29,8 @@ export class CartPage extends BasePage {
     this.totalAmount = page.locator('div._2PdFnJ span, span.a-size-medium').first();
     this.placeOrderButton = page.locator('button:has-text("Place Order"), button:has-text("PLACE ORDER")').first();
     this.cartCount = page.locator('span._2MHqjz, span[class*="cart-count"]').first();
+    this.quantityLimitMessage = page.locator('div:has-text("can\'t add more"), div:has-text("maximum order"), div:has-text("limit"), span:has-text("can\'t add more")').first();
+    this.quantityInput = page.locator('div._3dIHCP input, div[class*="quantity"] input, input[class*="qty"]').first();
   }
 
   // ── Actions ────────────────────────────────────────────────
@@ -65,6 +69,24 @@ export class CartPage extends BasePage {
     const minusButton = this.quantitySelectors.nth(index).locator('button:has-text("–"), button:has-text("-"), button[class*="minus"]');
     await this.click(minusButton);
     await this.waitForPageLoad();
+  }
+
+  async getItemQuantity(index = 0): Promise<number> {
+    const qtyText = await this.quantitySelectors.nth(index).locator('div[class*="value"], input, span').first().inputValue().catch(async () => {
+      const text = await this.quantitySelectors.nth(index).textContent() ?? '1';
+      const match = text.match(/\d+/);
+      return match ? match[0] : '1';
+    });
+    return parseInt(qtyText, 10) || 1;
+  }
+
+  async isIncreaseDisabled(index = 0): Promise<boolean> {
+    const plusButton = this.quantitySelectors.nth(index).locator('button:has-text("+"), button[class*="plus"]');
+    return plusButton.isDisabled().catch(() => false);
+  }
+
+  async hasQuantityLimitMessage(): Promise<boolean> {
+    return this.isVisible(this.quantityLimitMessage, 3_000);
   }
 
   async isCartEmpty(): Promise<boolean> {
