@@ -53,6 +53,7 @@ const ProjectsPage: React.FC = () => {
     status: 'active' as ProjectStatus,
   });
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const queryClient = useQueryClient();
 
@@ -141,29 +142,52 @@ const ProjectsPage: React.FC = () => {
       status: 'active',
     });
     setError('');
+    setFieldErrors({});
+  };
+
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    const trimmedName = formData.name.trim();
+    if (!trimmedName) {
+      errors.name = 'Project name is required';
+    } else if (trimmedName.length > 255) {
+      errors.name = 'Project name must be 255 characters or less';
+    }
+
+    if (formData.description && formData.description.length > 1000) {
+      errors.description = 'Description must be 1000 characters or less';
+    }
+
+    if (!formData.clientId) {
+      errors.clientId = 'Please select a client';
+    }
+
+    if (!formData.startDate) {
+      errors.startDate = 'Please select a start date';
+    } else if (isNaN(formData.startDate.getTime())) {
+      errors.startDate = 'Please enter a valid date';
+    }
+
+    const validStatuses: ProjectStatus[] = ['active', 'completed', 'on-hold'];
+    if (!validStatuses.includes(formData.status)) {
+      errors.status = 'Please select a valid status';
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!formData.name.trim()) {
-      setError('Project name is required');
-      return;
-    }
-
-    if (!formData.clientId) {
-      setError('Please select a client');
-      return;
-    }
-
-    if (!formData.startDate) {
-      setError('Please select a start date');
+    if (!validateForm()) {
       return;
     }
 
     const projectData = {
-      name: formData.name,
+      name: formData.name.trim(),
       description: formData.description || undefined,
       clientId: formData.clientId,
       startDate: formData.startDate.toISOString().split('T')[0],
@@ -314,14 +338,23 @@ const ProjectsPage: React.FC = () => {
                 fullWidth
                 required
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, name: e.target.value });
+                  if (fieldErrors.name) setFieldErrors({ ...fieldErrors, name: '' });
+                }}
                 disabled={createMutation.isPending || updateMutation.isPending}
+                error={!!fieldErrors.name}
+                helperText={fieldErrors.name || `${formData.name.trim().length}/255`}
+                inputProps={{ maxLength: 255 }}
               />
-              <FormControl fullWidth margin="dense" required>
+              <FormControl fullWidth margin="dense" required error={!!fieldErrors.clientId}>
                 <InputLabel>Client</InputLabel>
                 <Select
                   value={formData.clientId}
-                  onChange={(e) => setFormData({ ...formData, clientId: Number(e.target.value) })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, clientId: Number(e.target.value) });
+                    if (fieldErrors.clientId) setFieldErrors({ ...fieldErrors, clientId: '' });
+                  }}
                   disabled={createMutation.isPending || updateMutation.isPending}
                 >
                   {clients.map((client: { id: number; name: string }) => (
@@ -330,6 +363,11 @@ const ProjectsPage: React.FC = () => {
                     </MenuItem>
                   ))}
                 </Select>
+                {fieldErrors.clientId && (
+                  <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.75 }}>
+                    {fieldErrors.clientId}
+                  </Typography>
+                )}
               </FormControl>
               <Box sx={{ mt: 1, mb: 0.5 }}>
                 <DatePicker
@@ -338,23 +376,40 @@ const ProjectsPage: React.FC = () => {
                   onChange={(newValue) => {
                     if (newValue) {
                       setFormData({ ...formData, startDate: newValue });
+                      if (fieldErrors.startDate) setFieldErrors({ ...fieldErrors, startDate: '' });
                     }
                   }}
                   disabled={createMutation.isPending || updateMutation.isPending}
-                  slotProps={{ textField: { fullWidth: true, margin: 'dense' } }}
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      margin: 'dense',
+                      required: true,
+                      error: !!fieldErrors.startDate,
+                      helperText: fieldErrors.startDate,
+                    },
+                  }}
                 />
               </Box>
-              <FormControl fullWidth margin="dense">
+              <FormControl fullWidth margin="dense" error={!!fieldErrors.status}>
                 <InputLabel>Status</InputLabel>
                 <Select
                   value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as ProjectStatus })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, status: e.target.value as ProjectStatus });
+                    if (fieldErrors.status) setFieldErrors({ ...fieldErrors, status: '' });
+                  }}
                   disabled={createMutation.isPending || updateMutation.isPending}
                 >
                   <MenuItem value="active">Active</MenuItem>
                   <MenuItem value="completed">Completed</MenuItem>
                   <MenuItem value="on-hold">On Hold</MenuItem>
                 </Select>
+                {fieldErrors.status && (
+                  <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.75 }}>
+                    {fieldErrors.status}
+                  </Typography>
+                )}
               </FormControl>
               <TextField
                 margin="dense"
@@ -363,8 +418,14 @@ const ProjectsPage: React.FC = () => {
                 multiline
                 rows={3}
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, description: e.target.value });
+                  if (fieldErrors.description) setFieldErrors({ ...fieldErrors, description: '' });
+                }}
                 disabled={createMutation.isPending || updateMutation.isPending}
+                error={!!fieldErrors.description}
+                helperText={fieldErrors.description || `${formData.description.length}/1000`}
+                inputProps={{ maxLength: 1000 }}
               />
               {error && (
                 <Alert severity="error" sx={{ mt: 2 }}>
