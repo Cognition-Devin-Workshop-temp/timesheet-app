@@ -98,10 +98,17 @@ router.post('/', (req, res, next) => {
   }
 });
 
+function toDateString(date) {
+  if (!date) {
+    return null;
+  }
+  return date instanceof Date ? date.toISOString().split('T')[0] : date;
+}
+
 function insertProject(db, name, description, clientId, startDate, status, userEmail, res) {
   db.run(
     'INSERT INTO projects (name, description, client_id, start_date, status, user_email) VALUES (?, ?, ?, ?, ?, ?)',
-    [name, description || null, clientId || null, startDate || null, status, userEmail],
+    [name, description || null, clientId || null, toDateString(startDate), status, userEmail],
     function(err) {
       if (err) {
         console.error('Database error:', err);
@@ -211,7 +218,7 @@ function performUpdate(db, projectId, value, userEmail, res) {
 
   if (value.startDate !== undefined) {
     updates.push('start_date = ?');
-    values.push(value.startDate || null);
+    values.push(toDateString(value.startDate));
   }
 
   if (value.status !== undefined) {
