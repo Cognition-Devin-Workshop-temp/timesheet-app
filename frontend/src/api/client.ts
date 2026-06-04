@@ -133,6 +133,17 @@ class ApiClient {
     return response.data;
   }
 
+  // Timesheet endpoints
+  async getTimesheet(weekStart: string) {
+    const response = await this.client.get('/api/timesheet', { params: { weekStart } });
+    return response.data;
+  }
+
+  async saveTimesheet(weekStart: string, entries: { clientId: number; date: string; hours: number; description?: string }[]) {
+    const response = await this.client.put('/api/timesheet', { weekStart, entries });
+    return response.data;
+  }
+
   // Health check
   async healthCheck() {
     const response = await this.client.get('/health');
