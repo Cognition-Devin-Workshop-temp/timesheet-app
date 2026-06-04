@@ -13,6 +13,7 @@ import {
   Assignment as AssignmentIcon,
   Assessment as AssessmentIcon,
   Add as AddIcon,
+  Receipt as ReceiptIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -30,6 +31,13 @@ const DashboardPage: React.FC = () => {
     queryKey: ['workEntries'],
     queryFn: () => apiClient.getWorkEntries(),
   });
+
+  const { data: invoiceSummaryData } = useQuery({
+    queryKey: ['invoiceSummary'],
+    queryFn: () => apiClient.getInvoiceSummary(),
+  });
+
+  const invoiceSummary = invoiceSummaryData?.summary;
 
   const clients = clientsData?.clients || [];
   const workEntries = workEntriesData?.workEntries || [];
@@ -58,6 +66,13 @@ const DashboardPage: React.FC = () => {
       icon: <AssessmentIcon />,
       color: '#f57c00',
       action: () => navigate('/reports'),
+    },
+    {
+      title: 'Outstanding Invoices',
+      value: invoiceSummary ? `$${invoiceSummary.totalOutstanding.toFixed(0)}` : '$0',
+      icon: <ReceiptIcon />,
+      color: '#7b1fa2',
+      action: () => navigate('/invoices'),
     },
   ];
 
@@ -174,6 +189,14 @@ const DashboardPage: React.FC = () => {
                 fullWidth
               >
                 View Reports
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<ReceiptIcon />}
+                onClick={() => navigate('/invoices')}
+                fullWidth
+              >
+                Invoices
               </Button>
             </Box>
           </Paper>
