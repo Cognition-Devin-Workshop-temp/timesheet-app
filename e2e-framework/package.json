@@ -1,0 +1,21 @@
+{
+  "name": "playwright-e2e-framework",
+  "version": "1.0.0",
+  "description": "End-to-end Playwright automation framework with TypeScript, Page Object Model, and Excel-driven test data",
+  "scripts": {
+    "test": "npx playwright test",
+    "test:headed": "npx playwright test --headed",
+    "test:debug": "npx playwright test --debug",
+    "test:ui": "npx playwright test --ui",
+    "lint": "npx tsc --noEmit",
+    "report": "npx playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.45.0",
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0"
+  }
+}
