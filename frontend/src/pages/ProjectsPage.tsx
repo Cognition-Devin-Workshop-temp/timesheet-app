@@ -19,10 +19,12 @@ import {
   Alert,
   CircularProgress,
   Chip,
+  Autocomplete,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
+  createFilterOptions,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -34,7 +36,15 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import apiClient from '../api/client';
-import { type Project } from '../types/api';
+import { type Project, type Client } from '../types/api';
+
+interface ClientOption {
+  id: number;
+  name: string;
+  inputValue?: string;
+}
+
+const filter = createFilterOptions<ClientOption>();
 
 const statusColors: Record<string, 'success' | 'default' | 'warning'> = {
   active: 'success',
@@ -49,6 +59,7 @@ const ProjectsPage: React.FC = () => {
     name: '',
     description: '',
     clientId: 0,
+    newClientName: '',
     startDate: new Date(),
     status: 'active' as string,
   });
@@ -64,6 +75,14 @@ const ProjectsPage: React.FC = () => {
   const { data: clientsData, isLoading: clientsLoading } = useQuery({
     queryKey: ['clients'],
     queryFn: () => apiClient.getClients(),
+  });
+
+  const createClientMutation = useMutation({
+    mutationFn: (clientData: { name: string }) =>
+      apiClient.createClient(clientData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+    },
   });
 
   const createMutation = useMutation({
@@ -113,6 +132,7 @@ const ProjectsPage: React.FC = () => {
         name: project.name,
         description: project.description || '',
         clientId: project.client_id,
+        newClientName: '',
         startDate: new Date(project.start_date),
         status: project.status,
       });
@@ -122,6 +142,7 @@ const ProjectsPage: React.FC = () => {
         name: '',
         description: '',
         clientId: 0,
+        newClientName: '',
         startDate: new Date(),
         status: 'active',
       });
@@ -137,6 +158,7 @@ const ProjectsPage: React.FC = () => {
       name: '',
       description: '',
       clientId: 0,
+      newClientName: '',
       startDate: new Date(),
       status: 'active',
     });
@@ -152,8 +174,8 @@ const ProjectsPage: React.FC = () => {
       return;
     }
 
-    if (!formData.clientId) {
-      setError('Please select a client');
+    if (!formData.clientId && !formData.newClientName) {
+      setError('Please select or enter a client');
       return;
     }
 
@@ -162,21 +184,37 @@ const ProjectsPage: React.FC = () => {
       return;
     }
 
-    const projectData = {
-      name: formData.name,
-      description: formData.description,
-      clientId: formData.clientId,
-      startDate: formData.startDate.toISOString().split('T')[0],
-      status: formData.status,
+    const submitProject = (clientId: number) => {
+      const projectData = {
+        name: formData.name,
+        description: formData.description,
+        clientId,
+        startDate: formData.startDate.toISOString().split('T')[0],
+        status: formData.status,
+      };
+
+      if (editingProject) {
+        updateMutation.mutate({ id: editingProject.id, data: projectData });
+      } else {
+        createMutation.mutate(projectData);
+      }
     };
 
-    if (editingProject) {
-      updateMutation.mutate({
-        id: editingProject.id,
-        data: projectData,
-      });
+    if (formData.newClientName && !formData.clientId) {
+      createClientMutation.mutate(
+        { name: formData.newClientName },
+        {
+          onSuccess: (data) => {
+            submitProject(data.client.id);
+          },
+          onError: (err: unknown) => {
+            const error = err as { response?: { data?: { error?: string } } };
+            setError(error.response?.data?.error || 'Failed to create client');
+          },
+        }
+      );
     } else {
-      createMutation.mutate(projectData);
+      submitProject(formData.clientId);
     }
   };
 
@@ -296,20 +334,46 @@ const ProjectsPage: React.FC = () => {
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             />
-            <FormControl fullWidth margin="dense" required>
-              <InputLabel>Client</InputLabel>
-              <Select
-                value={formData.clientId || ''}
-                label="Client"
-                onChange={(e) => setFormData({ ...formData, clientId: Number(e.target.value) })}
-              >
-                {clients.map((client: { id: number; name: string }) => (
-                  <MenuItem key={client.id} value={client.id}>
-                    {client.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <Autocomplete
+              freeSolo
+              selectOnFocus
+              clearOnBlur
+              handleHomeEndKeys
+              options={clients as ClientOption[]}
+              getOptionLabel={(option) => {
+                if (typeof option === 'string') return option;
+                if (option.inputValue) return option.inputValue;
+                return option.name;
+              }}
+              value={clients.find((c: Client) => c.id === formData.clientId) || null}
+              onChange={(_event, newValue) => {
+                if (typeof newValue === 'string') {
+                  setFormData({ ...formData, clientId: 0, newClientName: newValue });
+                } else if (newValue && newValue.inputValue) {
+                  setFormData({ ...formData, clientId: 0, newClientName: newValue.inputValue });
+                } else if (newValue) {
+                  setFormData({ ...formData, clientId: newValue.id, newClientName: '' });
+                } else {
+                  setFormData({ ...formData, clientId: 0, newClientName: '' });
+                }
+              }}
+              filterOptions={(options, params) => {
+                const filtered = filter(options, params);
+                const { inputValue } = params;
+                const isExisting = options.some((option) => inputValue === option.name);
+                if (inputValue !== '' && !isExisting) {
+                  filtered.push({ id: 0, name: `Add "${inputValue}"`, inputValue });
+                }
+                return filtered;
+              }}
+              renderOption={(props, option) => {
+                const { key, ...rest } = props as React.HTMLAttributes<HTMLLIElement> & { key: string };
+                return <li key={key} {...rest}>{option.name}</li>;
+              }}
+              renderInput={(params) => (
+                <TextField {...params} label="Client" margin="dense" required fullWidth />
+              )}
+            />
             <LocalizationProvider dateAdapter={AdapterDateFns}>
               <DatePicker
                 label="Start Date"
