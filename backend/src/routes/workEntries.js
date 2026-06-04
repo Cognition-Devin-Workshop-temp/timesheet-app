@@ -84,7 +84,9 @@ router.post('/', (req, res, next) => {
       return next(error);
     }
 
-    const { clientId, hours, description, date } = value;
+    const { clientId, hours, description, date: rawDate } = value;
+    // Joi's date().iso() converts the string to a Date object; convert back to YYYY-MM-DD for SQLite storage
+    const date = rawDate instanceof Date ? rawDate.toISOString().split('T')[0] : rawDate;
     const db = getDatabase();
 
     // Verify client exists and belongs to user
@@ -214,7 +216,8 @@ router.put('/:id', (req, res, next) => {
 
           if (value.date !== undefined) {
             updates.push('date = ?');
-            values.push(value.date);
+            const dateStr = value.date instanceof Date ? value.date.toISOString().split('T')[0] : value.date;
+            values.push(dateStr);
           }
 
           updates.push('updated_at = CURRENT_TIMESTAMP');
