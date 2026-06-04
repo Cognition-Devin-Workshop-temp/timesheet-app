@@ -331,7 +331,7 @@ router.delete('/:teamId/members/:email', requireTeamAccess, (req, res) => {
       return res.status(500).json({ error: 'Internal server error' });
     }
 
-    if (team.manager_email === memberEmail) {
+    if (!team || team.manager_email === memberEmail) {
       return res.status(400).json({ error: 'Cannot remove the team manager' });
     }
 
@@ -432,6 +432,10 @@ router.get('/:teamId/workload', requireTeamAccess, (req, res, next) => {
             return res.status(500).json({ error: 'Internal server error' });
           }
 
+          if (!team) {
+            return res.status(404).json({ error: 'Team not found' });
+          }
+
           res.json({
             team: { id: team.id, name: team.name },
             period: { startDate: startStr, endDate: endStr },
@@ -499,6 +503,10 @@ router.get('/:teamId/workload/breakdown', requireTeamAccess, (req, res, next) =>
           if (err) {
             console.error('Database error:', err);
             return res.status(500).json({ error: 'Internal server error' });
+          }
+
+          if (!team) {
+            return res.status(404).json({ error: 'Team not found' });
           }
 
           res.json({
