@@ -438,4 +438,83 @@ describe('Report Routes', () => {
       );
     });
   });
+
+  describe('GET /api/reports/dashboard', () => {
+    test('should return weekly summary for the last 3 weeks', async () => {
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      const yesterdayDate = new Date(today);
+      yesterdayDate.setDate(today.getDate() - 1);
+      const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+
+      const mockRows = [
+        { hours: 5, date: todayStr, client_name: 'Client A' },
+        { hours: 3, date: todayStr, client_name: 'Client B' },
+        { hours: 4, date: yesterdayStr, client_name: 'Client A' },
+      ];
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, mockRows);
+      });
+
+      const response = await request(app).get('/api/reports/dashboard');
+
+      expect(response.status).toBe(200);
+      expect(response.body.weeks).toHaveLength(3);
+
+      const currentWeek = response.body.weeks[0];
+      expect(currentWeek).toHaveProperty('week_start');
+      expect(currentWeek).toHaveProperty('week_end');
+      expect(currentWeek).toHaveProperty('total_hours');
+      expect(currentWeek).toHaveProperty('entries');
+      expect(currentWeek.total_hours).toBe(12);
+      expect(currentWeek.entries).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ client_name: 'Client A', hours: 9 }),
+          expect.objectContaining({ client_name: 'Client B', hours: 3 }),
+        ])
+      );
+    });
+
+    test('should return empty weeks when no entries exist', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, []);
+      });
+
+      const response = await request(app).get('/api/reports/dashboard');
+
+      expect(response.status).toBe(200);
+      expect(response.body.weeks).toHaveLength(3);
+      response.body.weeks.forEach((week) => {
+        expect(week.total_hours).toBe(0);
+        expect(week.entries).toEqual([]);
+      });
+    });
+
+    test('should only return data for the authenticated user', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        expect(params).toEqual(['test@example.com']);
+        callback(null, []);
+      });
+
+      await request(app).get('/api/reports/dashboard');
+
+      expect(mockDb.all).toHaveBeenCalledWith(
+        expect.stringContaining('WHERE we.user_email = ?'),
+        ['test@example.com'],
+        expect.any(Function)
+      );
+    });
+
+    test('should handle database errors gracefully', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(new Error('Database error'), null);
+      });
+
+      const response = await request(app).get('/api/reports/dashboard');
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Internal server error' });
+    });
+  });
 });
