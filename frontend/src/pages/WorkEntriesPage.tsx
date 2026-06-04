@@ -194,7 +194,7 @@ const WorkEntriesPage: React.FC = () => {
           </Button>
         </Box>
 
-        {error && (
+        {error && !open && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
             {error}
           </Alert>
@@ -289,8 +289,13 @@ const WorkEntriesPage: React.FC = () => {
           <DialogTitle>
             {editingEntry ? 'Edit Work Entry' : 'Add New Work Entry'}
           </DialogTitle>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             <DialogContent>
+              {error && (
+                <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+                  {error}
+                </Alert>
+              )}
               <FormControl fullWidth margin="dense" required>
                 <InputLabel>Client</InputLabel>
                 <Select
