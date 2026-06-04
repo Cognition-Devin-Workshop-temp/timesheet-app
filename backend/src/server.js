@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -25,7 +26,7 @@ app.use(cors({
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  max: process.env.NODE_ENV === 'development' ? 10000 : 100,
 });
 app.use(limiter);
 
@@ -46,6 +47,20 @@ app.use('/api/auth', authRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/work-entries', workEntryRoutes);
 app.use('/api/reports', reportRoutes);
+
+// Test reset endpoint (development only)
+if (process.env.NODE_ENV === 'development') {
+  app.post('/api/test/reset', async (req, res) => {
+    const { getDatabase } = require('./database/init');
+    const db = getDatabase();
+    db.serialize(() => {
+      db.run('DELETE FROM work_entries');
+      db.run('DELETE FROM clients');
+      db.run('DELETE FROM users');
+    });
+    res.json({ status: 'reset complete' });
+  });
+}
 
 // Error handling
 app.use(errorHandler);
