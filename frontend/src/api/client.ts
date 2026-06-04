@@ -1,11 +1,10 @@
 import axios, { type AxiosInstance, type AxiosResponse } from 'axios';
 
-// Use empty string to make requests relative to the current origin
-// Vite proxy will forward /api requests to the backend
 const API_BASE_URL = '';
 
 class ApiClient {
   private client: AxiosInstance;
+  private csrfToken: string | null = null;
 
   constructor() {
     this.client = axios.create({
@@ -14,14 +13,17 @@ class ApiClient {
       headers: {
         'Content-Type': 'application/json',
       },
+      withCredentials: true,
     });
 
-    // Request interceptor to add email header
     this.client.interceptors.request.use(
       (config) => {
-        const userEmail = localStorage.getItem('userEmail');
-        if (userEmail) {
-          config.headers['x-user-email'] = userEmail;
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          config.headers['Authorization'] = `Bearer ${token}`;
+        }
+        if (this.csrfToken && config.method && ['post', 'put', 'delete', 'patch'].includes(config.method)) {
+          config.headers['x-csrf-token'] = this.csrfToken;
         }
         return config;
       },
@@ -30,12 +32,11 @@ class ApiClient {
       }
     );
 
-    // Response interceptor for error handling
     this.client.interceptors.response.use(
       (response: AxiosResponse) => response,
       (error) => {
         if (error.response?.status === 401) {
-          // Clear stored email on auth error
+          localStorage.removeItem('authToken');
           localStorage.removeItem('userEmail');
           window.location.href = '/login';
         }
@@ -44,9 +45,26 @@ class ApiClient {
     );
   }
 
+  async fetchCsrfToken() {
+    const response = await this.client.get('/api/csrf-token');
+    this.csrfToken = response.data.csrfToken;
+    return this.csrfToken;
+  }
+
   // Auth endpoints
-  async login(email: string) {
-    const response = await this.client.post('/api/auth/login', { email });
+  async login(email: string, password: string) {
+    if (!this.csrfToken) {
+      await this.fetchCsrfToken();
+    }
+    const response = await this.client.post('/api/auth/login', { email, password });
+    return response.data;
+  }
+
+  async register(email: string, password: string) {
+    if (!this.csrfToken) {
+      await this.fetchCsrfToken();
+    }
+    const response = await this.client.post('/api/auth/register', { email, password });
     return response.data;
   }
 
@@ -67,21 +85,33 @@ class ApiClient {
   }
 
   async createClient(clientData: { name: string; description?: string; department?: string; email?: string }) {
+    if (!this.csrfToken) {
+      await this.fetchCsrfToken();
+    }
     const response = await this.client.post('/api/clients', clientData);
     return response.data;
   }
 
   async updateClient(id: number, clientData: { name?: string; description?: string; department?: string; email?: string }) {
+    if (!this.csrfToken) {
+      await this.fetchCsrfToken();
+    }
     const response = await this.client.put(`/api/clients/${id}`, clientData);
     return response.data;
   }
 
   async deleteClient(id: number) {
+    if (!this.csrfToken) {
+      await this.fetchCsrfToken();
+    }
     const response = await this.client.delete(`/api/clients/${id}`);
     return response.data;
   }
 
   async deleteAllClients() {
+    if (!this.csrfToken) {
+      await this.fetchCsrfToken();
+    }
     const response = await this.client.delete('/api/clients');
     return response.data;
   }
@@ -99,16 +129,25 @@ class ApiClient {
   }
 
   async createWorkEntry(entryData: { clientId: number; hours: number; description?: string; date: string }) {
+    if (!this.csrfToken) {
+      await this.fetchCsrfToken();
+    }
     const response = await this.client.post('/api/work-entries', entryData);
     return response.data;
   }
 
   async updateWorkEntry(id: number, entryData: { clientId?: number; hours?: number; description?: string; date?: string }) {
+    if (!this.csrfToken) {
+      await this.fetchCsrfToken();
+    }
     const response = await this.client.put(`/api/work-entries/${id}`, entryData);
     return response.data;
   }
 
   async deleteWorkEntry(id: number) {
+    if (!this.csrfToken) {
+      await this.fetchCsrfToken();
+    }
     const response = await this.client.delete(`/api/work-entries/${id}`);
     return response.data;
   }

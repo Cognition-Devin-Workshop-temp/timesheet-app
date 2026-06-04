@@ -126,6 +126,48 @@ describe('Error Handler Middleware', () => {
     });
   });
 
+  describe('CSRF Errors', () => {
+    test('should handle CSRF error with EBADCSRFTOKEN code', () => {
+      const csrfError = {
+        code: 'EBADCSRFTOKEN',
+        message: 'invalid csrf token'
+      };
+
+      errorHandler(csrfError, req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Invalid or missing CSRF token'
+      });
+    });
+
+    test('should handle CSRF error with invalid csrf token message', () => {
+      const csrfError = {
+        message: 'invalid csrf token'
+      };
+
+      errorHandler(csrfError, req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Invalid or missing CSRF token'
+      });
+    });
+
+    test('should handle CSRF misconfigured error', () => {
+      const csrfError = {
+        message: 'misconfigured csrf'
+      };
+
+      errorHandler(csrfError, req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Invalid or missing CSRF token'
+      });
+    });
+  });
+
   describe('Console Logging', () => {
     test('should log error to console', () => {
       const error = new Error('Test error');

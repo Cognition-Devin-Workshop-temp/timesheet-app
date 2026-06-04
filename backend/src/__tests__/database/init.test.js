@@ -28,7 +28,6 @@ describe('Database Initialization', () => {
     consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
     
-    // Reset the database singleton
     jest.resetModules();
   });
 
@@ -43,7 +42,6 @@ describe('Database Initialization', () => {
       const db = getDatabase();
       
       expect(db).toBeDefined();
-      expect(consoleLogSpy).toHaveBeenCalledWith('Connected to SQLite in-memory database');
     });
 
     test('should return same database instance on multiple calls', () => {
@@ -82,7 +80,6 @@ describe('Database Initialization', () => {
       expect(db.serialize).toHaveBeenCalled();
       expect(db.run).toHaveBeenCalled();
       
-      // Check that run was called for each table and index
       const runCalls = db.run.mock.calls;
       const queries = runCalls.map(call => call[0]);
       
@@ -113,6 +110,15 @@ describe('Database Initialization', () => {
     test('should resolve promise on success', async () => {
       await expect(initializeDatabase()).resolves.toBeUndefined();
     });
+
+    test('should enable foreign keys', async () => {
+      const db = getDatabase();
+      await initializeDatabase();
+
+      const runCalls = db.run.mock.calls;
+      const queries = runCalls.map(call => call[0]);
+      expect(queries.some(q => q.includes('PRAGMA foreign_keys = ON'))).toBe(true);
+    });
   });
 
   describe('closeDatabase', () => {
@@ -135,10 +141,9 @@ describe('Database Initialization', () => {
 
     test('should handle multiple close calls safely', () => {
       const db = getDatabase();
-      // Reset close mock to default behavior (no error)
       db.close.mockImplementation((callback) => callback(null));
       closeDatabase();
-      closeDatabase(); // Second call should not throw
+      closeDatabase();
 
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
@@ -155,6 +160,10 @@ describe('Database Initialization', () => {
 
       expect(userTableQuery).toBeDefined();
       expect(userTableQuery[0]).toContain('email TEXT PRIMARY KEY');
+      expect(userTableQuery[0]).toContain('password_hash TEXT NOT NULL');
+      expect(userTableQuery[0]).toContain('role TEXT NOT NULL');
+      expect(userTableQuery[0]).toContain('failed_login_attempts INTEGER NOT NULL DEFAULT 0');
+      expect(userTableQuery[0]).toContain('locked_until DATETIME');
       expect(userTableQuery[0]).toContain('created_at DATETIME DEFAULT CURRENT_TIMESTAMP');
     });
 

@@ -1,30 +1,32 @@
 # Production Deployment Guide
 
-## ⚠️ Important Security & Data Considerations
+## Security Configuration
 
-### Data Persistence Warning
-**This application uses SQLite in-memory database as specified in requirements.** 
-- All data will be lost when the server restarts
-- Not suitable for production use without modification
-- For production, consider switching to file-based SQLite or a proper database
+### Required Environment Variables
 
-### Authentication Security
-- Email-only authentication assumes trusted network environment
-- No password protection - anyone with a valid company email can access
-- Consider integrating with company SSO for production use
-- JWT tokens expire after 24 hours
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `JWT_SECRET` | **Yes** | Must be at least 32 characters. Server refuses to start without it in production. Generate: `openssl rand -base64 32` |
+| `CSRF_SECRET` | **Yes** | Secret for CSRF token generation. Use a strong random value. |
+| `NODE_ENV` | **Yes** | Set to `production` |
+| `DATABASE_PATH` | No | SQLite database file path (default: `./data/timesheet.db`) |
+| `PORT` | No | Server port (default: 3001) |
+| `FRONTEND_URL` | **Yes** | Frontend URL for CORS (e.g., `https://your-app.com`) |
 
-## Environment Configuration
+### Setup Steps
 
 1. **Copy environment variables:**
 ```bash
 cp .env.example .env
 ```
 
-2. **Set strong JWT secret:**
+2. **Generate strong secrets:**
 ```bash
-# Generate a secure random secret (32+ characters recommended)
+# Generate JWT secret (32+ characters required)
 JWT_SECRET=$(openssl rand -base64 32)
+
+# Generate CSRF secret
+CSRF_SECRET=$(openssl rand -base64 32)
 ```
 
 3. **Update .env file:**
@@ -32,42 +34,71 @@ JWT_SECRET=$(openssl rand -base64 32)
 NODE_ENV=production
 PORT=3001
 FRONTEND_URL=https://your-frontend-domain.com
-JWT_SECRET=your-generated-secret-key-here
+JWT_SECRET=<generated-jwt-secret>
+CSRF_SECRET=<generated-csrf-secret>
+DATABASE_PATH=./data/timesheet.db
 ```
 
-## Production Deployment Steps
-
-### Option 1: Simple PM2 Deployment
+4. **Ensure database directory exists:**
 ```bash
-# Install PM2 globally
+mkdir -p data
+```
+
+## Authentication & Security
+
+### Password Requirements
+- Minimum 8 characters
+- At least one uppercase letter
+- At least one lowercase letter
+- At least one number
+- Passwords hashed with bcryptjs (12 salt rounds)
+
+### JWT Tokens
+- 8-hour expiration
+- Includes `issuer` (timesheet-app) and `audience` (timesheet-app-users) claims
+- Server validates these claims on every request
+- **In production, server will not start if JWT_SECRET is missing or < 32 chars**
+
+### CSRF Protection
+- Double-submit cookie pattern via csrf-csrf
+- All POST/PUT/DELETE requests require `x-csrf-token` header
+- Frontend fetches token from `GET /api/csrf-token` before state-changing requests
+
+### Account Lockout
+- After 5 failed login attempts, account is locked for 15 minutes
+- Lockout status tracked in the database
+- Automatically resets after lockout period expires
+
+### Rate Limiting
+- Auth routes (login/register): 5 requests per 15 minutes per IP
+- General routes: 100 requests per 15 minutes per IP
+
+### User Roles
+- `user` (default): Can only manage their own clients and work entries
+- `admin`: Can manage all clients across all users
+
+## Deployment Options
+
+### Option 1: PM2 Deployment
+```bash
 npm install -g pm2
-
-# Install dependencies
 npm install --production
-
-# Start with PM2
+mkdir -p data
 pm2 start src/server.js --name "time-tracker-api"
-
-# Save PM2 configuration
 pm2 save
 pm2 startup
 ```
 
 ### Option 2: Docker Deployment
-```dockerfile
-FROM node:18-alpine
-
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm ci --only=production
-
-COPY src/ ./src/
-
-EXPOSE 3001
-
-CMD ["node", "src/server.js"]
+```bash
+cd docker
+docker-compose up -d
 ```
+
+The Docker configuration:
+- Mounts a volume for SQLite database persistence
+- Passes required environment variables
+- Uses Node.js 20-alpine base image
 
 ### Option 3: Systemd Service
 Create `/etc/systemd/system/time-tracker.service`:
@@ -83,33 +114,39 @@ WorkingDirectory=/path/to/app
 ExecStart=/usr/bin/node src/server.js
 Restart=always
 Environment=NODE_ENV=production
+EnvironmentFile=/path/to/app/.env
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-## Security Hardening
+## Security Hardening Checklist
 
-1. **Use HTTPS in production**
-2. **Set up proper CORS for your domain**
-3. **Consider rate limiting adjustments**
-4. **Monitor for unusual authentication patterns**
-5. **Regular security updates for dependencies**
+1. **Use HTTPS** - All traffic must be encrypted
+2. **Set strong JWT_SECRET** - At least 32 random characters
+3. **Set strong CSRF_SECRET** - Different from JWT_SECRET
+4. **Configure CORS** - Set `FRONTEND_URL` to your exact frontend domain
+5. **Review rate limits** - Adjust based on expected traffic
+6. **Monitor auth failures** - Set up alerts for account lockouts
+7. **Regular dependency updates** - Run `npm audit` periodically
+8. **Database backups** - Back up `data/timesheet.db` regularly
+9. **File permissions** - Restrict access to `.env` and database files
 
 ## Monitoring & Logging
 
-- Application logs go to console
-- Consider using Winston or similar for structured logging
-- Set up log rotation for production
-- Monitor server health via `/health` endpoint
-
-## Scaling Considerations
-
-- In-memory database cannot be scaled horizontally
-- Consider load balancer for multiple frontend instances
-- Database persistence required for horizontal scaling
+- Application logs go to console (use PM2/Docker for log management)
+- Health check: `GET /health` returns `{ status: 'OK', timestamp: '...' }`
+- Monitor `/api/auth/login` for 423 (locked) responses to detect brute force attempts
+- Consider structured logging (Winston) for production
 
 ## Backup Strategy
 
-**Not applicable for in-memory database** - data is ephemeral.
-For production with persistent storage, implement regular database backups.
+Back up the SQLite database file regularly:
+```bash
+cp data/timesheet.db data/timesheet.db.backup.$(date +%Y%m%d)
+```
+
+For automated backups, set up a cron job:
+```bash
+0 2 * * * cp /path/to/data/timesheet.db /path/to/backups/timesheet.db.$(date +\%Y\%m\%d)
+```

@@ -1,44 +1,42 @@
-const { getDatabase } = require('../database/init');
+const jwt = require('jsonwebtoken');
 
-// Simple email-based authentication middleware
+function getJwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 32) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('JWT_SECRET must be set and at least 32 characters in production');
+    }
+    return 'dev-only-jwt-secret-not-for-production-use!!';
+  }
+  return secret;
+}
+
+const JWT_ISSUER = 'timesheet-app';
+const JWT_AUDIENCE = 'timesheet-app-users';
+
 function authenticateUser(req, res, next) {
-  const userEmail = req.headers['x-user-email'];
+  const authHeader = req.headers['authorization'];
   
-  if (!userEmail) {
-    return res.status(401).json({ error: 'User email required in x-user-email header' });
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required. Provide a Bearer token.' });
   }
 
-  // Validate email format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(userEmail)) {
-    return res.status(400).json({ error: 'Invalid email format' });
-  }
+  const token = authHeader.split(' ')[1];
 
-  const db = getDatabase();
-  
-  // Check if user exists, create if not
-  db.get('SELECT email FROM users WHERE email = ?', [userEmail], (err, row) => {
-    if (err) {
-      console.error('Database error:', err);
-      return res.status(500).json({ error: 'Internal server error' });
+  try {
+    const decoded = jwt.verify(token, getJwtSecret(), {
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE
+    });
+    req.userEmail = decoded.email;
+    req.userRole = decoded.role || 'user';
+    next();
+  } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Token expired. Please log in again.' });
     }
-    
-    if (!row) {
-      // Create new user
-      db.run('INSERT INTO users (email) VALUES (?)', [userEmail], (err) => {
-        if (err) {
-          console.error('Error creating user:', err);
-          return res.status(500).json({ error: 'Failed to create user' });
-        }
-        
-        req.userEmail = userEmail;
-        next();
-      });
-    } else {
-      req.userEmail = userEmail;
-      next();
-    }
-  });
+    return res.status(401).json({ error: 'Invalid token' });
+  }
 }
 
 module.exports = {

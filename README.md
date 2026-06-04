@@ -2,43 +2,35 @@
 
 A full-stack web application for tracking and reporting employee hourly work across different clients.
 
-## ⚠️ Important Notes
-
-### Data Persistence
-**This application uses SQLite in-memory database as specified in requirements.**
-- ⚠️ **All data is lost when the backend server restarts**
-- Suitable for development and testing
-- For production use, modify `backend/src/database/init.js` to use file-based SQLite instead of `:memory:`
-
-### Authentication
-- Email-only authentication with JWT tokens
-- No password required - assumes trusted internal network
-- Anyone with a valid email can create an account and log in
-- Consider integrating with company SSO for production use
-
 ## Features
 
-- ✅ User authentication (email-based with JWT tokens)
-- ✅ Add, edit, and delete clients
-- ✅ Add, edit, and delete hourly work entries for each client
-- ✅ View hourly reports for each client
-- ✅ Export hourly reports to CSV or PDF
+- Password-based authentication with bcrypt hashing and JWT tokens
+- User registration and login with account lockout protection
+- Role-based access control (admin/user)
+- CSRF protection via double-submit cookie pattern
+- Add, edit, and delete clients
+- Add, edit, and delete hourly work entries for each client
+- View hourly reports for each client
+- Export hourly reports to CSV or PDF
 
 ## Tech Stack
 
 ### Frontend
-- **React** with TypeScript
+- **React 19** with TypeScript
 - **Vite** for build tooling
 - **Material UI** for components
 - **React Query** for server state management
 - **React Router** for navigation
-- **Axios** for API calls
+- **Axios** for API calls (with CSRF token handling)
 
 ### Backend
 - **Node.js** with Express
-- **SQLite** in-memory database
-- **JWT** for authentication
-- **Joi** for validation
+- **SQLite** file-based database (persistent)
+- **JWT** for authentication (issuer/audience claims, 8h expiry)
+- **bcryptjs** for password hashing (12 salt rounds)
+- **csrf-csrf** for CSRF protection
+- **Joi** for input validation
+- **Helmet** with Content Security Policy
 - **PDFKit** for PDF generation
 - **csv-writer** for CSV export
 
@@ -49,39 +41,44 @@ A full-stack web application for tracking and reporting employee hourly work acr
 ├── backend/
 │   ├── src/
 │   │   ├── database/
-│   │   │   └── init.js           # Database initialization
+│   │   │   └── init.js           # Database initialization (file-based SQLite)
 │   │   ├── middleware/
-│   │   │   ├── auth.js           # JWT authentication
-│   │   │   └── errorHandler.js  # Error handling
+│   │   │   ├── auth.js           # JWT authentication (Bearer token)
+│   │   │   ├── authorize.js      # Role-based access control
+│   │   │   └── errorHandler.js   # Error handling (incl. CSRF errors)
 │   │   ├── routes/
-│   │   │   ├── auth.js           # Authentication endpoints
-│   │   │   ├── clients.js        # Client CRUD
+│   │   │   ├── auth.js           # Login, register, account lockout
+│   │   │   ├── clients.js        # Client CRUD (role-aware)
 │   │   │   ├── workEntries.js    # Work entry CRUD
 │   │   │   └── reports.js        # Reporting & export
 │   │   ├── validation/
-│   │   │   └── schemas.js        # Joi validation schemas
-│   │   └── server.js             # Express server
+│   │   │   └── schemas.js        # Joi validation (incl. password rules)
+│   │   └── server.js             # Express server (CSRF, Helmet CSP, rate limiting)
+│   ├── data/                     # SQLite database directory (gitignored)
 │   ├── package.json
 │   └── DEPLOYMENT.md             # Production deployment guide
 │
-└── frontend/
-    ├── src/
-    │   ├── api/
-    │   │   └── client.ts         # API client with JWT
-    │   ├── components/
-    │   │   └── Layout.tsx        # Main layout
-    │   ├── contexts/
-    │   │   └── AuthContext.tsx   # Auth state management
-    │   ├── pages/
-    │   │   ├── LoginPage.tsx     # Login page
-    │   │   ├── DashboardPage.tsx # Dashboard
-    │   │   ├── ClientsPage.tsx   # Client management
-    │   │   ├── WorkEntriesPage.tsx # Work entry management
-    │   │   └── ReportsPage.tsx   # Reports & exports
-    │   ├── types/
-    │   │   └── api.ts            # TypeScript interfaces
-    │   └── App.tsx               # Main app component
-    └── package.json
+├── frontend/
+│   ├── src/
+│   │   ├── api/
+│   │   │   └── client.ts         # API client (JWT + CSRF)
+│   │   ├── components/
+│   │   │   └── Layout.tsx        # Main layout
+│   │   ├── contexts/
+│   │   │   ├── AuthContext.tsx    # Auth state management
+│   │   │   └── AuthContextValue.ts # Auth context types
+│   │   ├── pages/
+│   │   │   ├── LoginPage.tsx     # Login/Register with password
+│   │   │   ├── DashboardPage.tsx # Dashboard
+│   │   │   ├── ClientsPage.tsx   # Client management
+│   │   │   ├── WorkEntriesPage.tsx # Work entry management
+│   │   │   └── ReportsPage.tsx   # Reports & exports
+│   │   ├── types/
+│   │   │   └── api.ts            # TypeScript interfaces
+│   │   └── App.tsx               # Main app component
+│   └── package.json
+│
+└── docker/                       # Docker configuration
 ```
 
 ## Getting Started
@@ -112,8 +109,12 @@ cp .env.example .env
 PORT=3001
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
-JWT_SECRET=your-secure-secret-key-change-this
+JWT_SECRET=your-super-secret-jwt-key-change-this-in-production-min-32-chars
+CSRF_SECRET=your-csrf-secret-change-in-production
+DATABASE_PATH=./data/timesheet.db
 ```
+
+> **Important:** In production, `JWT_SECRET` must be at least 32 characters. The server will refuse to start without a valid secret in production mode.
 
 5. Start the development server:
 ```bash
@@ -134,17 +135,7 @@ cd frontend
 npm install
 ```
 
-3. Create environment file:
-```bash
-cp .env.example .env
-```
-
-4. Update `.env`:
-```bash
-VITE_API_URL=http://localhost:3001
-```
-
-5. Start the development server:
+3. Start the development server:
 ```bash
 npm run dev
 ```
@@ -154,18 +145,29 @@ Frontend will be running at `http://localhost:5173`
 ## Usage
 
 1. Open `http://localhost:5173` in your browser
-2. Enter any email address to log in (no password required)
-3. Start adding clients and tracking work hours
-4. View reports and export data as CSV or PDF
+2. Click the "Register" tab to create a new account with email and password
+3. Log in with your credentials
+4. Start adding clients and tracking work hours
+5. View reports and export data as CSV or PDF
+
+### Password Requirements
+- Minimum 8 characters
+- At least one uppercase letter
+- At least one lowercase letter
+- At least one number
 
 ## API Endpoints
 
 ### Authentication
-- `POST /api/auth/login` - Login with email, returns JWT token
+- `POST /api/auth/register` - Register with email & password, returns JWT token
+- `POST /api/auth/login` - Login with email & password, returns JWT token
 - `GET /api/auth/me` - Get current user info (requires auth)
 
+### CSRF
+- `GET /api/csrf-token` - Get CSRF token (required before POST/PUT/DELETE)
+
 ### Clients
-- `GET /api/clients` - Get all clients
+- `GET /api/clients` - Get all clients (admin sees all, users see own)
 - `POST /api/clients` - Create new client
 - `GET /api/clients/:id` - Get specific client
 - `PUT /api/clients/:id` - Update client
@@ -184,15 +186,29 @@ Frontend will be running at `http://localhost:5173`
 - `GET /api/reports/export/pdf/:clientId` - Export report as PDF
 
 All authenticated endpoints require `Authorization: Bearer <token>` header.
+All state-changing endpoints require `x-csrf-token` header.
 
 ## Security Features
 
-- JWT-based authentication with 24-hour token expiration
-- Rate limiting on authentication endpoints (5 attempts per 15 minutes)
-- CORS protection
-- Helmet security headers
-- Input validation with Joi schemas
-- SQL injection protection with parameterized queries
+- **Password hashing** with bcryptjs (12 salt rounds)
+- **JWT authentication** with 8-hour token expiration, issuer/audience claims
+- **CSRF protection** via double-submit cookie pattern (csrf-csrf)
+- **Account lockout** after 5 failed login attempts (15-minute lockout)
+- **Rate limiting** on auth endpoints (5 attempts per 15 minutes)
+- **General rate limiting** (100 requests per 15 minutes)
+- **Role-based access control** (admin/user roles)
+- **Content Security Policy** via Helmet
+- **CORS protection** with configured origins
+- **Input validation** with Joi schemas
+- **SQL injection protection** with parameterized queries
+- **File-based SQLite** for persistent data storage
+
+## User Roles
+
+| Role | Permissions |
+|------|------------|
+| `user` (default) | Manage own clients and work entries |
+| `admin` | Manage all clients and work entries across all users |
 
 ## Development
 
@@ -218,28 +234,6 @@ npm run test:coverage       # Run tests with coverage report
 npm run test:watch          # Run tests in watch mode
 ```
 
-### Test Coverage
-
-The backend has comprehensive test coverage with **161 tests** across 8 test suites:
-
-| File | Statements | Branches | Functions | Lines |
-|------|------------|----------|-----------|-------|
-| **Overall** | **90.16%** | **93.82%** | **92.18%** | **90.35%** |
-| database/init.js | 100% | 100% | 100% | 100% |
-| middleware/auth.js | 100% | 100% | 100% | 100% |
-| middleware/errorHandler.js | 100% | 100% | 100% | 100% |
-| routes/auth.js | 100% | 100% | 100% | 100% |
-| routes/clients.js | 97.89% | 100% | 100% | 97.89% |
-| routes/workEntries.js | 98.41% | 100% | 100% | 98.41% |
-| routes/reports.js | 64.15% | 69.44% | 68.75% | 64.42% |
-| validation/schemas.js | 100% | 100% | 100% | 100% |
-
-Coverage thresholds are configured in `jest.config.js`:
-- Statements: 60%
-- Branches: 60%
-- Functions: 65%
-- Lines: 60%
-
 ### Building for Production
 
 **Backend:**
@@ -260,33 +254,20 @@ npm run preview  # Preview production build
 See `backend/DEPLOYMENT.md` for detailed production deployment instructions.
 
 ### Quick Production Checklist
-- [ ] Set strong `JWT_SECRET` in environment variables
+- [ ] Set strong `JWT_SECRET` (32+ characters) in environment variables
+- [ ] Set strong `CSRF_SECRET` in environment variables
 - [ ] Configure proper `FRONTEND_URL` for CORS
-- [ ] Consider switching to file-based SQLite for data persistence
+- [ ] Set `NODE_ENV=production`
 - [ ] Set up HTTPS/SSL certificates
 - [ ] Configure proper logging and monitoring
-- [ ] Set up automated backups (if using persistent storage)
+- [ ] Set up automated database backups
 - [ ] Review and adjust rate limiting settings
-- [ ] Consider integrating with company SSO
 
 ## Known Limitations
 
-1. **In-memory database** - All data is lost on server restart
-2. **Email-only auth** - No password protection, assumes trusted network
-3. **No user roles** - All users have equal access to all data
-4. **Single-server architecture** - Not designed for horizontal scaling
-5. **No real-time updates** - Changes require page refresh
-
-## Future Enhancements
-
-- Persistent database storage
-- User roles and permissions
-- Multi-tenancy support
-- Real-time updates with WebSockets
-- Advanced reporting and analytics
-- Email notifications
-- Mobile app
-- Integration with calendar systems
+1. **Single-server architecture** - Not designed for horizontal scaling
+2. **No real-time updates** - Changes require page refresh
+3. **SQLite** - Not suitable for high-concurrency production workloads
 
 ## License
 
