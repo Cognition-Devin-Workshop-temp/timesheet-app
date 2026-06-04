@@ -18,6 +18,7 @@ import {
 import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
+  CalendarMonth as CalendarMonthIcon,
   Business as BusinessIcon,
   Assignment as AssignmentIcon,
   Assessment as AssessmentIcon,
@@ -44,6 +45,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
+    { text: 'Timesheet', icon: <CalendarMonthIcon />, path: '/timesheet' },
     { text: 'Clients', icon: <BusinessIcon />, path: '/clients' },
     { text: 'Work Entries', icon: <AssignmentIcon />, path: '/work-entries' },
     { text: 'Reports', icon: <AssessmentIcon />, path: '/reports' },
