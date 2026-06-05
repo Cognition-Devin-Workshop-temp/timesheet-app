@@ -1,0 +1,40 @@
+[project]
+name = "reverse-mcp"
+version = "0.1.0"
+description = "Reverse Model Context Protocol — NAT-traversal tunnel for local MCP servers accessed by cloud AI agents"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.13.4",
+    "websockets>=16.0",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=2.1.0",
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.15.16",
+]
+
+[project.scripts]
+rmcp-relay = "reverse_mcp.relay.server:main"
+rmcp-tunnel = "reverse_mcp.tunnel.client:main"
+rmcp-agent = "reverse_mcp.agent.client:main"
+rmcp-demo = "reverse_mcp.demo:main"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
