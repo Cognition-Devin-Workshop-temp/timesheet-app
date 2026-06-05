@@ -5,6 +5,12 @@ const { projectSchema, updateProjectSchema } = require('../validation/schemas');
 
 const router = express.Router();
 
+const ALLOWED_STATUS_TRANSITIONS = {
+  'active': ['on-hold', 'completed'],
+  'on-hold': ['active', 'completed'],
+  'completed': ['active']
+};
+
 // All routes require authentication
 router.use(authenticateUser);
 
@@ -145,9 +151,9 @@ router.put('/:id', (req, res, next) => {
 
     const db = getDatabase();
 
-    // Check if project exists and belongs to user
+    // Check if project exists and belongs to user (fetch status for transition validation)
     db.get(
-      'SELECT id FROM projects WHERE id = ? AND user_email = ?',
+      'SELECT id, status FROM projects WHERE id = ? AND user_email = ?',
       [projectId, req.userEmail],
       (err, row) => {
         if (err) {
@@ -157,6 +163,16 @@ router.put('/:id', (req, res, next) => {
 
         if (!row) {
           return res.status(404).json({ error: 'Project not found' });
+        }
+
+        // Validate status transition
+        if (value.status !== undefined && value.status !== row.status) {
+          const allowed = ALLOWED_STATUS_TRANSITIONS[row.status];
+          if (!allowed || !allowed.includes(value.status)) {
+            return res.status(400).json({
+              error: `Invalid status transition from '${row.status}' to '${value.status}'`
+            });
+          }
         }
 
         const executeUpdate = () => {

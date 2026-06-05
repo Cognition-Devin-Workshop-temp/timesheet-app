@@ -222,6 +222,18 @@ describe('Project Routes', () => {
       expect(response.body).toEqual({ error: 'Validation error' });
     });
 
+    test('should return 400 for future start date', async () => {
+      const futureDate = new Date();
+      futureDate.setFullYear(futureDate.getFullYear() + 1);
+
+      const response = await request(app)
+        .post('/api/projects')
+        .send({ name: 'Test', startDate: futureDate.toISOString().split('T')[0] });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Validation error' });
+    });
+
     test('should handle database error on insert', async () => {
       mockDb.run.mockImplementation(function(query, params, callback) {
         callback.call(this, new Error('Database error'));
@@ -259,9 +271,9 @@ describe('Project Routes', () => {
       const updateData = { name: 'Updated Project', status: 'completed' };
       const updatedProject = { id: 1, name: 'Updated Project', description: 'Desc', client_id: 1, start_date: '2024-01-01', status: 'completed', client_name: 'Client A', created_at: '2024-01-01', updated_at: '2024-01-02' };
 
-      // First call: check if project exists
+      // First call: check if project exists (active -> completed is allowed)
       mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1 });
+        callback(null, { id: 1, status: 'active' });
       });
 
       mockDb.run.mockImplementation(function(query, params, callback) {
@@ -337,7 +349,7 @@ describe('Project Routes', () => {
 
     test('should handle database error on update', async () => {
       mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1 });
+        callback(null, { id: 1, status: 'active' });
       });
 
       mockDb.run.mockImplementation(function(query, params, callback) {
@@ -354,7 +366,7 @@ describe('Project Routes', () => {
 
     test('should handle database error on retrieve after update', async () => {
       mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1 });
+        callback(null, { id: 1, status: 'active' });
       });
 
       mockDb.run.mockImplementation(function(query, params, callback) {
@@ -374,12 +386,10 @@ describe('Project Routes', () => {
     });
 
     test('should return 400 if updated clientId does not belong to user', async () => {
-      // First call: project exists
       mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1 });
+        callback(null, { id: 1, status: 'active' });
       });
 
-      // Second call: client ownership check fails
       mockDb.get.mockImplementationOnce((query, params, callback) => {
         callback(null, null);
       });
@@ -393,12 +403,10 @@ describe('Project Routes', () => {
     });
 
     test('should handle database error on client ownership check during update', async () => {
-      // First call: project exists
       mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1 });
+        callback(null, { id: 1, status: 'active' });
       });
 
-      // Second call: db error on client check
       mockDb.get.mockImplementationOnce((query, params, callback) => {
         callback(new Error('Database error'), null);
       });
@@ -409,6 +417,122 @@ describe('Project Routes', () => {
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Internal server error' });
+    });
+
+    test('should allow valid status transition: active -> on-hold', async () => {
+      const updatedProject = { id: 1, name: 'P', status: 'on-hold' };
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1, status: 'active' });
+      });
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        callback.call(this, null);
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, updatedProject);
+      });
+
+      const response = await request(app)
+        .put('/api/projects/1')
+        .send({ status: 'on-hold' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.project.status).toBe('on-hold');
+    });
+
+    test('should allow valid status transition: on-hold -> active', async () => {
+      const updatedProject = { id: 1, name: 'P', status: 'active' };
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1, status: 'on-hold' });
+      });
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        callback.call(this, null);
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, updatedProject);
+      });
+
+      const response = await request(app)
+        .put('/api/projects/1')
+        .send({ status: 'active' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.project.status).toBe('active');
+    });
+
+    test('should allow valid status transition: completed -> active (reopen)', async () => {
+      const updatedProject = { id: 1, name: 'P', status: 'active' };
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1, status: 'completed' });
+      });
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        callback.call(this, null);
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, updatedProject);
+      });
+
+      const response = await request(app)
+        .put('/api/projects/1')
+        .send({ status: 'active' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.project.status).toBe('active');
+    });
+
+    test('should reject invalid status transition: completed -> on-hold', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1, status: 'completed' });
+      });
+
+      const response = await request(app)
+        .put('/api/projects/1')
+        .send({ status: 'on-hold' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('Invalid status transition');
+    });
+
+    test('should allow same status (no transition)', async () => {
+      const updatedProject = { id: 1, name: 'Updated', status: 'active' };
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1, status: 'active' });
+      });
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        callback.call(this, null);
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, updatedProject);
+      });
+
+      const response = await request(app)
+        .put('/api/projects/1')
+        .send({ name: 'Updated', status: 'active' });
+
+      expect(response.status).toBe(200);
+    });
+
+    test('should return 400 for future start date on update', async () => {
+      const futureDate = new Date();
+      futureDate.setFullYear(futureDate.getFullYear() + 1);
+
+      const response = await request(app)
+        .put('/api/projects/1')
+        .send({ startDate: futureDate.toISOString().split('T')[0] });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Validation error' });
     });
   });
 

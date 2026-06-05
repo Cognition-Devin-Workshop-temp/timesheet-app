@@ -35,13 +35,27 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import { type Project, type Client } from '../types/api';
 
+type ProjectStatus = 'active' | 'completed' | 'on-hold';
+
 interface ProjectFormData {
   name: string;
   description: string;
   clientId: string;
   startDate: string;
-  status: 'active' | 'completed' | 'on-hold';
+  status: ProjectStatus;
 }
+
+const ALLOWED_STATUS_TRANSITIONS: Record<ProjectStatus, ProjectStatus[]> = {
+  'active': ['active', 'on-hold', 'completed'],
+  'on-hold': ['on-hold', 'active', 'completed'],
+  'completed': ['completed', 'active'],
+};
+
+const STATUS_LABELS: Record<ProjectStatus, string> = {
+  'active': 'Active',
+  'completed': 'Completed',
+  'on-hold': 'On Hold',
+};
 
 const ProjectsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -143,12 +157,19 @@ const ProjectsPage: React.FC = () => {
     setError('');
   };
 
+  const todayStr = new Date().toISOString().split('T')[0];
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
     if (!formData.name.trim()) {
       setError('Project name is required');
+      return;
+    }
+
+    if (formData.startDate && formData.startDate > todayStr) {
+      setError('Start date cannot be in the future');
       return;
     }
 
@@ -188,6 +209,12 @@ const ProjectsPage: React.FC = () => {
     }
   };
 
+  const availableStatuses: ProjectStatus[] = editingProject
+    ? ALLOWED_STATUS_TRANSITIONS[editingProject.status] || ['active', 'completed', 'on-hold']
+    : ['active', 'completed', 'on-hold'];
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
   if (isLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -200,22 +227,19 @@ const ProjectsPage: React.FC = () => {
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4">Projects</Typography>
-        <Box display="flex" gap={1}>
+        <Box display="flex" gap={2}>
           {projects.length > 0 && (
             <Button
               variant="outlined"
               color="error"
               startIcon={<DeleteSweepIcon />}
               onClick={handleDeleteAll}
+              disabled={deleteAllMutation.isPending}
             >
-              Delete All
+              {deleteAllMutation.isPending ? 'Clearing...' : 'Clear All'}
             </Button>
           )}
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => handleOpen()}
-          >
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpen()}>
             Add Project
           </Button>
         </Box>
@@ -227,17 +251,8 @@ const ProjectsPage: React.FC = () => {
         </Alert>
       )}
 
-      {projects.length === 0 ? (
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography variant="h6" color="text.secondary">
-            No projects yet
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Click "Add Project" to create your first project.
-          </Typography>
-        </Paper>
-      ) : (
-        <TableContainer component={Paper}>
+      <Paper>
+        <TableContainer>
           <Table>
             <TableHead>
               <TableRow>
@@ -250,43 +265,86 @@ const ProjectsPage: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {projects.map((project) => (
-                <TableRow key={project.id}>
-                  <TableCell>{project.name}</TableCell>
-                  <TableCell>{project.description || '—'}</TableCell>
-                  <TableCell>{project.client_name || '—'}</TableCell>
-                  <TableCell>{project.start_date || '—'}</TableCell>
-                  <TableCell>
-                    <Chip
-                      label={project.status}
-                      color={getStatusColor(project.status)}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    <IconButton size="small" onClick={() => handleOpen(project)}>
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton size="small" color="error" onClick={() => handleDelete(project)}>
-                      <DeleteIcon />
-                    </IconButton>
+              {projects.length > 0 ? (
+                projects.map((project) => (
+                  <TableRow key={project.id}>
+                    <TableCell>
+                      <Typography variant="subtitle1" fontWeight="medium">
+                        {project.name}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      {project.description ? (
+                        <Typography variant="body2" color="text.secondary">
+                          {project.description}
+                        </Typography>
+                      ) : (
+                        <Chip label="No description" size="small" variant="outlined" />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {project.client_name ? (
+                        <Typography variant="body2" color="text.secondary">
+                          {project.client_name}
+                        </Typography>
+                      ) : (
+                        <Chip label="-" size="small" variant="outlined" />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {project.start_date ? (
+                        <Typography variant="body2" color="text.secondary">
+                          {new Date(project.start_date).toLocaleDateString()}
+                        </Typography>
+                      ) : (
+                        <Chip label="-" size="small" variant="outlined" />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={project.status}
+                        color={getStatusColor(project.status)}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      <IconButton
+                        onClick={() => handleOpen(project)}
+                        color="primary"
+                        size="small"
+                      >
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton
+                        onClick={() => handleDelete(project)}
+                        color="error"
+                        size="small"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} align="center">
+                    <Typography color="text.secondary" sx={{ py: 3 }}>
+                      No projects found. Create your first project to get started.
+                    </Typography>
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </TableContainer>
-      )}
+      </Paper>
 
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          {editingProject ? 'Edit Project' : 'Add New Project'}
+        </DialogTitle>
         <form onSubmit={handleSubmit}>
-          <DialogTitle>{editingProject ? 'Edit Project' : 'Add Project'}</DialogTitle>
           <DialogContent>
-            {error && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {error}
-              </Alert>
-            )}
             <TextField
               autoFocus
               margin="dense"
@@ -295,6 +353,7 @@ const ProjectsPage: React.FC = () => {
               required
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              disabled={isPending}
             />
             <TextField
               margin="dense"
@@ -304,6 +363,7 @@ const ProjectsPage: React.FC = () => {
               rows={3}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              disabled={isPending}
             />
             <FormControl fullWidth margin="dense">
               <InputLabel>Client</InputLabel>
@@ -311,6 +371,7 @@ const ProjectsPage: React.FC = () => {
                 value={formData.clientId}
                 label="Client"
                 onChange={(e: SelectChangeEvent) => setFormData({ ...formData, clientId: e.target.value })}
+                disabled={isPending}
               >
                 <MenuItem value="">
                   <em>None</em>
@@ -328,30 +389,41 @@ const ProjectsPage: React.FC = () => {
               type="date"
               fullWidth
               InputLabelProps={{ shrink: true }}
+              inputProps={{ max: todayStr }}
               value={formData.startDate}
               onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+              disabled={isPending}
             />
             <FormControl fullWidth margin="dense">
               <InputLabel>Status</InputLabel>
               <Select
                 value={formData.status}
                 label="Status"
-                onChange={(e: SelectChangeEvent) => setFormData({ ...formData, status: e.target.value as 'active' | 'completed' | 'on-hold' })}
+                onChange={(e: SelectChangeEvent) => setFormData({ ...formData, status: e.target.value as ProjectStatus })}
+                disabled={isPending}
               >
-                <MenuItem value="active">Active</MenuItem>
-                <MenuItem value="completed">Completed</MenuItem>
-                <MenuItem value="on-hold">On Hold</MenuItem>
+                {availableStatuses.map((s) => (
+                  <MenuItem key={s} value={s}>
+                    {STATUS_LABELS[s]}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleClose}>Cancel</Button>
+            <Button onClick={handleClose} disabled={isPending}>
+              Cancel
+            </Button>
             <Button
               type="submit"
               variant="contained"
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isPending}
             >
-              {editingProject ? 'Update' : 'Create'}
+              {isPending ? (
+                <CircularProgress size={24} />
+              ) : (
+                editingProject ? 'Update' : 'Create'
+              )}
             </Button>
           </DialogActions>
         </form>
