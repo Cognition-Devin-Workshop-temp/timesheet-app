@@ -72,6 +72,34 @@ export interface LoginResponse {
   user: User;
 }
 
+export interface TopLogger {
+  user_email: string;
+  total_hours: number;
+  entry_count: number;
+}
+
+export interface UpcomingDeadline {
+  user_email: string;
+  date: string;
+  hours: number;
+  description: string | null;
+  client_name: string;
+}
+
+export interface ActiveClient {
+  client_id: number;
+  client_name: string;
+  total_hours: number;
+  entry_count: number;
+  user_count: number;
+}
+
+export interface TeamDashboardData {
+  topLoggers: TopLogger[];
+  upcomingDeadlines: UpcomingDeadline[];
+  activeClients: ActiveClient[];
+}
+
 export interface ApiResponse<T> {
   data?: T;
   error?: string;
